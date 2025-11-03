@@ -1,0 +1,25 @@
+# Compiler files
+cache/
+out/
+
+broadcast/
+.broadcast/
+.deployments/
+.cache/
+.forge-cache/
+coverage/
+coverage.json
+
+# Docs
+docs/
+
+# lib
+lib/
+
+# Dotenv file
+.env
+
+# IDE / misc
+.DS_Store
+.vscode/
+*.log
