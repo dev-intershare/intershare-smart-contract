@@ -8,6 +8,7 @@ import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
 import {MockPyth} from "../mocks/MockPyth.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {OracleLib} from "../../src/libraries/OracleLib.sol";
+import {TokenConfig} from "../../src/types/ISLoanTypes.sol";
 
 /**
  * @title ISLoanEngineTest
@@ -63,14 +64,18 @@ contract ISLoanEngineTest is Test {
             7500,
             address(usdtOracle),
             address(pyth),
-            usdtPriceId
+            usdtPriceId,
+            5e16,
+            13e16
         );
         engine.addToken(
             address(is21),
             8000,
             address(is21Oracle),
             address(pyth),
-            is21PriceId
+            is21PriceId,
+            5e16,
+            13e16
         );
 
         // --- Mint user balances and approve engine ---
@@ -177,24 +182,32 @@ contract ISLoanEngineTest is Test {
     // -------------------------------------------------------
 
     function test_OracleFallbackToPythWhenChainlinkStale() public {
+        // Simulate Chainlink data becoming stale
         vm.warp(block.timestamp + 2 hours);
 
+        // Update Pyth fallback price
         bytes32 priceId = bytes32("USDT/USD");
         pyth.setPrice(priceId, 99_000_000, -8); // $0.99
 
-        (, , OracleLib.OracleConfig memory oracleCfg, , , , , , , ) = engine
-            .tokenConfigs(address(usdt));
-        uint256 price = OracleLib.getPrice(oracleCfg);
+        // Get the token config (which includes oracle references)
+        TokenConfig memory cfg = engine.getTokenConfig(address(usdt));
 
+        // Use the oracle config inside it
+        uint256 price = OracleLib.getPrice(cfg.oracle);
+
+        // Should use the Pyth fallback (~0.99 USD)
         assertApproxEqRel(price, 0.99e18, 1e16); // within 1%
     }
 
     function test_OracleUsesChainlinkWhenFresh() public view {
-        (, , OracleLib.OracleConfig memory oracleCfg, , , , , , , ) = engine
-            .tokenConfigs(address(usdt));
+        // Get the full token configuration
+        TokenConfig memory cfg = engine.getTokenConfig(address(usdt));
 
-        uint256 price = OracleLib.getPrice(oracleCfg);
-        assertEq(price, 1e18);
+        // Read price from the oracle configuration
+        uint256 price = OracleLib.getPrice(cfg.oracle);
+
+        // Expect the Chainlink feed to be fresh and return $1.00
+        assertEq(price, 1e18, "Expected Chainlink price to be $1.00");
     }
 
     // -------------------------------------------------------

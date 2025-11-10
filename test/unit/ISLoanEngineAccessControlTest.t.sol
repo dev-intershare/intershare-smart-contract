@@ -28,7 +28,9 @@ contract ISLoanEngineAccessControlTest is Test {
             8000,
             address(usdcOracle),
             address(0x1234),
-            bytes32("USDC/USD")
+            bytes32("USDC/USD"),
+            5e16,
+            13e16
         );
         vm.stopPrank();
     }

@@ -52,7 +52,9 @@ contract ISLoanEngineFuzzTest is Test {
             7500,
             address(usdtOracle),
             address(pyth),
-            usdtPriceId
+            usdtPriceId,
+            5e16,
+            13e16
         );
 
         engine.addToken(
@@ -60,7 +62,9 @@ contract ISLoanEngineFuzzTest is Test {
             8000,
             address(is21Oracle),
             address(pyth),
-            is21PriceId
+            is21PriceId,
+            5e16,
+            13e16
         );
 
         // Give user funds
@@ -98,13 +102,24 @@ contract ISLoanEngineFuzzTest is Test {
 
         uint256 borrowAmount = depositAmount / 2;
 
-        uint256 available = engine.availableLiquidity(address(usdt));
+        // Access totals via public getters
+        uint256 totalDeposits = engine.totalDeposits(address(usdt));
+        uint256 totalBorrows = engine.totalBorrows(address(usdt));
+        uint256 available = engine.getAvailableLiquidity(address(usdt));
+
+        assertEq(totalDeposits, depositAmount, "Deposit tracking failed");
+        assertEq(totalBorrows, 0, "Borrow tracking should be zero initially");
+
         if (borrowAmount > available) {
             vm.expectRevert();
             engine.borrow(address(usdt), borrowAmount);
         } else {
             engine.borrow(address(usdt), borrowAmount);
             engine.repay(address(usdt), borrowAmount);
+
+            // Post-conditions
+            uint256 afterBorrows = engine.totalBorrows(address(usdt));
+            assertEq(afterBorrows, 0, "Repay should clear all borrows");
         }
         vm.stopPrank();
     }
@@ -119,7 +134,7 @@ contract ISLoanEngineFuzzTest is Test {
         vm.startPrank(user);
         engine.deposit(address(usdt), depositAmount);
 
-        uint256 available = engine.availableLiquidity(address(is21));
+        uint256 available = engine.getAvailableLiquidity(address(is21));
         if (borrowAmount <= available) {
             engine.borrow(address(is21), borrowAmount);
             uint256 hf = engine.getHealthFactor(user);
@@ -141,7 +156,7 @@ contract ISLoanEngineFuzzTest is Test {
         vm.startPrank(user);
         engine.deposit(address(usdt), depositAmount);
 
-        uint256 available = engine.availableLiquidity(address(is21));
+        uint256 available = engine.getAvailableLiquidity(address(is21));
         if (borrowAmount <= available) {
             engine.borrow(address(is21), borrowAmount);
         } else {
