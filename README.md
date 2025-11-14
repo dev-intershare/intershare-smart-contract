@@ -30,7 +30,8 @@ It provides on-chain accountability and controlled minting/burning through stric
 - **Pausable & Reentrancy-Protected:** compliant with industry-grade safety patterns
 - **Version:** `IS21_VERSION = "1.0.0"`
 
-**Verified Contract:** [View on Etherscan](https://etherscan.io/token/0x3619a9103397121B6157859504637689b5C67C3a#code)  
+**Verified Contract:** [View on Etherscan](https://etherscan.io/token/0x3619a9103397121B6157859504637689b5C67C3a#code) <br/>
+**Contract Address:** 0x3619a9103397121B6157859504637689b5C67C3a <br/>
 **Source:** [`contracts/IS21Engine.sol`](https://github.com/dev-intershare/intershare-smart-contract/blob/main/src/IS21Engine.sol)
 
 ---
@@ -51,7 +52,7 @@ It leverages the IS21 token as a base collateral unit and integrates dual-source
 - **Pausing & Reentrancy Protection:** all external calls guarded
 - **Comprehensive Test Suite:** 30+ passing unit tests covering all flows
 
-**Verified Contract:** [View on Etherscan](TBA)
+**Verified Contract:** [View on Etherscan](TBA) <br/>
 **Source:** [`contracts/ISLoanEngine.sol`](https://github.com/dev-intershare/intershare-smart-contract/blob/main/src/ISLoanEngine.sol)
 
 ---
