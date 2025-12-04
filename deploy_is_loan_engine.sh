@@ -23,15 +23,12 @@ fi
 NETWORK=$1
 SIMULATE=$2   # optional --simulate flag
 
-# --- Optional Dry-Run Flag ---
-if [ "$2" == "--dry-run" ] || [ "$2" == "--dry" ]; then
-    DRY_RUN=true
-fi
-
 CMD="forge script $SCRIPT_PATH"
 
-# Add broadcast only if not simulating
-if [ "$SIMULATE" != "--simulate" ]; then
+# Add broadcast unless user explicitly simulates
+if [ "$SIMULATE" == "--simulate" ] || [ "$SIMULATE" == "--dry-run" ] || [ "$SIMULATE" == "--dry" ]; then
+    echo "🟡 Simulation mode: not broadcasting."
+else
     CMD="$CMD --broadcast"
 fi
 
