@@ -11,7 +11,7 @@ import {TokenConfig} from "./types/ISLoanTypes.sol";
 
 /**
  * @title ISLoanConfig
- * @author BlueAsset Technology Team
+ * @author InterShare Team
  *
  * @notice Configuration and risk management module for the InterShare Lending Protocol.
  * Handles:
@@ -24,6 +24,7 @@ import {TokenConfig} from "./types/ISLoanTypes.sol";
  * It holds no state-changing logic related to lending, borrowing, or accounting —
  * only configuration and governance controls.
  */
+
 contract ISLoanConfig is Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
