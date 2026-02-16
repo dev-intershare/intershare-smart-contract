@@ -126,10 +126,21 @@ contract IS21FundManagerGateway is Ownable, ReentrancyGuard, Pausable {
     /////////////////
     // Constructor //
     /////////////////
+
+    /** 
+        @param ownerAddress The address of the owner of the contract.
+        @param is21Engine The address of the IS21 engine contract.
+        @notice The owner address/is21 address cannot be zero.
+        @dev The constructor initializes the contract with the owner's address and the IS21 engine address.
+    */
     constructor(
         address ownerAddress,
         address is21Engine
     ) Ownable(ownerAddress) {
+        if (ownerAddress == address(0)) {
+            revert IS21FMG__NotZeroAddress();
+        }
+
         if (is21Engine == address(0)) {
             revert IS21FMG__NotZeroAddress();
         }
@@ -169,6 +180,12 @@ contract IS21FundManagerGateway is Ownable, ReentrancyGuard, Pausable {
         }
     }
 
+    /**
+        This function retrieves the list of all approved authorized callers.
+        @return An array of addresses representing the approved authorized callers.
+        @notice This function is view-only and does not modify the state of the contract.
+        @dev It can be used to get a list of all authorized addresses for administrative or informational purposes.
+    */
     function getAuthorizedCallers() external view returns (address[] memory) {
         return sAuthorizedCallers.values();
     }
