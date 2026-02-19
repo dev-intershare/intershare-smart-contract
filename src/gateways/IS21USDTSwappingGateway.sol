@@ -169,7 +169,7 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
         address _trustedSigner,
         address _usdt,
         address _fundManagerGateway
-    ) EIP712("IS21USDTSwappingGateway", "1") Ownable(ownerAddress) {
+    ) EIP712("IS21USDTSwappingGateway", IS21_SWAP_VERSION) Ownable(ownerAddress) {
         if (
             ownerAddress == address(0) ||
             _trustedSigner == address(0) ||
