@@ -52,7 +52,7 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
     error IS21SG__NotZeroAddress();
     error IS21SG__InvalidAmount();
     error IS21SG__NonceUsed();
-    error IS21SG__InsufficientBurnLiquidity();
+    error IS21SG__InsufficientLiquidity();
     error IS21SG__ZeroAddress();
     error IS21SG__InvalidWallet();
     error IS21SG__OnlyFundManagerCanExecute();
@@ -79,6 +79,10 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
     /////////////////////
     // Constants       //
     /////////////////////
+    uint8 private constant RESERVE_DECIMALS = 18; // IS21 uses 18 decimals
+    uint8 private constant USDT_DECIMALS = 6; // USDT uses 6 decimals
+    uint256 private constant USDT_TO_18_SCALE =
+        10 ** (RESERVE_DECIMALS - USDT_DECIMALS); // Convert USDT to 18 decimals
     bytes32 private constant CURRENCY_USDT = bytes32("USDT");
     bytes32 private constant ACTION_MINT = keccak256("MINT");
     bytes32 private constant ACTION_BURN = keccak256("BURN");
@@ -102,8 +106,7 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
     EnumerableSet.AddressSet private sFundManagers;
 
     // --- Liquidity accounting ---
-    uint256 public pendingMintUSDT;
-    uint256 public availableBurnUSDT;
+    uint256 public availableUSDT;
 
     // Replay protection
     mapping(address => mapping(uint256 => bool)) private sUsedNonces;
@@ -125,8 +128,8 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
         uint256 timestamp
     );
 
-    event BurnUSDTDeposited(uint256 amount, uint256 timestamp);
-    event MintUSDTWithdrawn(uint256 amount, uint256 timestamp);
+    event USDTDeposited(uint256 amount, uint256 timestamp);
+    event USDTWithdrawn(uint256 amount, uint256 timestamp);
     event GatewayPaused(address indexed caller, uint256 timestamp);
     event GatewayUnpaused(address indexed caller, uint256 timestamp);
     event FundManagerApproved(address indexed caller, uint256 timestamp);
@@ -169,7 +172,10 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
         address _trustedSigner,
         address _usdt,
         address _fundManagerGateway
-    ) EIP712("IS21USDTSwappingGateway", IS21_SWAP_VERSION) Ownable(ownerAddress) {
+    )
+        EIP712("IS21USDTSwappingGateway", IS21_SWAP_VERSION)
+        Ownable(ownerAddress)
+    {
         if (
             ownerAddress == address(0) ||
             _trustedSigner == address(0) ||
@@ -230,15 +236,15 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
 
         // --- Custody USDT ---
         usdt.safeTransferFrom(msg.sender, address(this), quote.usdtAmount);
-        pendingMintUSDT += quote.usdtAmount;
+        availableUSDT += quote.usdtAmount;
 
         // --- Mint through Fund Manager Gateway ---
         FiatReserves[] memory reserves = new FiatReserves[](1);
 
-        reserves[0] = FiatReserves({
-            currency: CURRENCY_USDT,
-            amount: quote.usdtAmount
-        });
+        // We store reserves as 18 decimals and USDT uses 6 decimals
+        uint256 usdtAs18 = quote.usdtAmount * USDT_TO_18_SCALE;
+
+        reserves[0] = FiatReserves({currency: CURRENCY_USDT, amount: usdtAs18});
 
         fundManagerGateway.mintWithReservesIncrease(
             msg.sender,
@@ -277,8 +283,8 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
         if (sUsedNonces[msg.sender][quote.nonce]) {
             revert IS21SG__NonceUsed();
         }
-        if (quote.usdtAmount > availableBurnUSDT) {
-            revert IS21SG__InsufficientBurnLiquidity();
+        if (quote.usdtAmount > availableUSDT) {
+            revert IS21SG__InsufficientLiquidity();
         }
 
         bytes32 digest = _hashTypedDataV4(
@@ -302,15 +308,15 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
         sUsedNonces[msg.sender][quote.nonce] = true;
         emit NonceUsed(msg.sender, quote.nonce, ACTION_BURN);
 
-        availableBurnUSDT -= quote.usdtAmount;
+        availableUSDT -= quote.usdtAmount;
 
         // --- Burn through Fund Manager Gateway ---
         FiatReserves[] memory reserves = new FiatReserves[](1);
 
-        reserves[0] = FiatReserves({
-            currency: CURRENCY_USDT,
-            amount: quote.usdtAmount
-        });
+        // We store reserves as 18 decimals and USDT uses 6 decimals
+        uint256 usdtAs18 = quote.usdtAmount * USDT_TO_18_SCALE;
+
+        reserves[0] = FiatReserves({currency: CURRENCY_USDT, amount: usdtAs18});
 
         fundManagerGateway.burnWithReservesDecrease(
             msg.sender,
@@ -331,28 +337,28 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
     ///////////////////////////////////
     // Fund Manager Settlement        //
     ///////////////////////////////////
-    function withdrawMintUSDT(
+    function withdrawUSDT(
         address to,
         uint256 amount
     ) external onlyFundManager whenNotPaused nonReentrant {
-        if (amount == 0 || amount > pendingMintUSDT)
+        if (amount == 0 || amount > availableUSDT)
             revert IS21SG__InvalidAmount();
 
-        pendingMintUSDT -= amount;
+        availableUSDT -= amount;
         usdt.safeTransfer(to, amount);
 
-        emit MintUSDTWithdrawn(amount, block.timestamp);
+        emit USDTWithdrawn(amount, block.timestamp);
     }
 
-    function depositBurnUSDT(
+    function depositUSDT(
         uint256 amount
     ) external onlyFundManager whenNotPaused nonReentrant {
         if (amount == 0) revert IS21SG__InvalidAmount();
 
         usdt.safeTransferFrom(msg.sender, address(this), amount);
-        availableBurnUSDT += amount;
+        availableUSDT += amount;
 
-        emit BurnUSDTDeposited(amount, block.timestamp);
+        emit USDTDeposited(amount, block.timestamp);
     }
 
     ///////////////////////////////////
