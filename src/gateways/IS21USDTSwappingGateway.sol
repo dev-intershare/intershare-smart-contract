@@ -97,15 +97,11 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
     // State Variables //
     /////////////////////
     string public constant IS21_SWAP_VERSION = "1.0.0";
-
     IERC20 public immutable USDT;
     IIS21FundManagerGateway public immutable FUND_MANAGER_GATEWAY;
     address public immutable TRUSTED_SIGNER;
     EnumerableSet.AddressSet private sFundManagers;
-
-    // --- Liquidity accounting ---
     uint256 public availableUsdt;
-
     // Replay protection
     mapping(address => mapping(uint256 => bool)) private sUsedNonces;
 
@@ -189,8 +185,14 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
     }
 
     ///////////////////////////////////
-    // Mint: USDT -> IS21             //
+    // Mint: USDT -> IS21            //
     ///////////////////////////////////
+    /**
+     * This function allows a user to buy IS21 using his USDT
+     * @param quote The generated quote for minting.
+     * @param signature The complete signed signature.
+     * @dev Once minted we also increase the USDT reserve of IS21.
+     */
     function mintWithQuote(
         MintQuote calldata quote,
         bytes calldata signature
@@ -259,8 +261,15 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
     }
 
     ///////////////////////////////////
-    // Burn: IS21 -> USDT             //
+    // Burn: IS21 -> USDT            //
     ///////////////////////////////////
+    /**
+     * This function allows a user to sell IS21 for USDT.
+     * @param quote The generated quote for burning.
+     * @param signature The complete signed signature.
+     * @dev This contract must have a positive USDT balance to be able to burn IS21.
+     * @dev Once burned we also decrease the USDT reserve of IS21.
+     */
     function burnWithQuote(
         BurnQuote calldata quote,
         bytes calldata signature
@@ -333,8 +342,14 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
     }
 
     ///////////////////////////////////
-    // Fund Manager Settlement        //
+    // Fund Manager Settlement       //
     ///////////////////////////////////
+    /**
+     * This function allows a fund manager to withdraw USDT from this contract.
+     * @param to The address to withdraw USDT to.
+     * @param amount The amount of USDT to withdraw.
+     * @dev This allows a fund manager to withdraw USDT to rebalance IS21.
+     */
     function withdrawUsdt(
         address to,
         uint256 amount
@@ -348,6 +363,11 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
         emit USDTWithdrawn(amount, block.timestamp);
     }
 
+    /**
+     * This function allows a fund manager to deposit USDT to this contract.
+     * @param amount The amount of USDT to deposit to this contract.
+     * @dev The USDT deposited to this contract is used for burning actions (allows a user to sell IS21 for USDT).
+     */
     function depositUsdt(
         uint256 amount
     ) external onlyFundManager whenNotPaused nonReentrant {
@@ -400,11 +420,23 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
         return sFundManagers.values();
     }
 
+    /**
+        This function allows the owner to pause the contract.
+        @notice This function can only be called by the owner.
+        @dev It uses the _pause function from the Pausable contract to pause the contract.
+        @dev It emits a ContractPaused event to log the pausing action.
+    */
     function pause() external onlyOwner {
         _pause();
         emit GatewayPaused(msg.sender, block.timestamp);
     }
 
+    /**
+        This function allows the owner to unpause the contract.
+        @notice This function can only be called by the owner.
+        @dev It uses the _unpause function from the Pausable contract to unpause the contract.
+        @dev It emits a ContractUnpaused event to log the unpausing action.
+    */
     function unpause() external onlyOwner {
         _unpause();
         emit GatewayUnpaused(msg.sender, block.timestamp);
