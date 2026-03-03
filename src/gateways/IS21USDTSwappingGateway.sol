@@ -16,9 +16,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
  *
  * @notice
  * Handles user-facing USDT <-> IS21 swaps using signed quotes.
- * USDT custody is INTERNAL and separated into:
- *  - pendingMintUSDT  (user deposits, fund managers withdraw)
- *  - availableBurnUSDT (fund managers deposit, users withdraw)
+ * USDT custody is INTERNAL and can be withdrawn or deposited.
  */
 
 struct FiatReserves {
@@ -100,13 +98,13 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
     /////////////////////
     string public constant IS21_SWAP_VERSION = "1.0.0";
 
-    IERC20 public immutable usdt;
-    IIS21FundManagerGateway public immutable fundManagerGateway;
-    address public immutable trustedSigner;
+    IERC20 public immutable USDT;
+    IIS21FundManagerGateway public immutable FUND_MANAGER_GATEWAY;
+    address public immutable TRUSTED_SIGNER;
     EnumerableSet.AddressSet private sFundManagers;
 
     // --- Liquidity accounting ---
-    uint256 public availableUSDT;
+    uint256 public availableUsdt;
 
     // Replay protection
     mapping(address => mapping(uint256 => bool)) private sUsedNonces;
@@ -185,9 +183,9 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
             revert IS21SG__ZeroAddress();
         }
 
-        trustedSigner = _trustedSigner;
-        usdt = IERC20(_usdt);
-        fundManagerGateway = IIS21FundManagerGateway(_fundManagerGateway);
+        TRUSTED_SIGNER = _trustedSigner;
+        USDT = IERC20(_usdt);
+        FUND_MANAGER_GATEWAY = IIS21FundManagerGateway(_fundManagerGateway);
     }
 
     ///////////////////////////////////
@@ -227,7 +225,7 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
             )
         );
 
-        if (ECDSA.recover(digest, signature) != trustedSigner) {
+        if (ECDSA.recover(digest, signature) != TRUSTED_SIGNER) {
             revert IS21SG__InvalidSignature();
         }
 
@@ -235,8 +233,8 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
         emit NonceUsed(msg.sender, quote.nonce, ACTION_MINT);
 
         // --- Custody USDT ---
-        usdt.safeTransferFrom(msg.sender, address(this), quote.usdtAmount);
-        availableUSDT += quote.usdtAmount;
+        USDT.safeTransferFrom(msg.sender, address(this), quote.usdtAmount);
+        availableUsdt += quote.usdtAmount;
 
         // --- Mint through Fund Manager Gateway ---
         FiatReserves[] memory reserves = new FiatReserves[](1);
@@ -246,7 +244,7 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
 
         reserves[0] = FiatReserves({currency: CURRENCY_USDT, amount: usdtAs18});
 
-        fundManagerGateway.mintWithReservesIncrease(
+        FUND_MANAGER_GATEWAY.mintWithReservesIncrease(
             msg.sender,
             reserves,
             quote.is21Amount
@@ -283,7 +281,7 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
         if (sUsedNonces[msg.sender][quote.nonce]) {
             revert IS21SG__NonceUsed();
         }
-        if (quote.usdtAmount > availableUSDT) {
+        if (quote.usdtAmount > availableUsdt) {
             revert IS21SG__InsufficientLiquidity();
         }
 
@@ -300,7 +298,7 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
             )
         );
 
-        if (ECDSA.recover(digest, signature) != trustedSigner) {
+        if (ECDSA.recover(digest, signature) != TRUSTED_SIGNER) {
             revert IS21SG__InvalidSignature();
         }
 
@@ -308,7 +306,7 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
         sUsedNonces[msg.sender][quote.nonce] = true;
         emit NonceUsed(msg.sender, quote.nonce, ACTION_BURN);
 
-        availableUSDT -= quote.usdtAmount;
+        availableUsdt -= quote.usdtAmount;
 
         // --- Burn through Fund Manager Gateway ---
         FiatReserves[] memory reserves = new FiatReserves[](1);
@@ -318,13 +316,13 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
 
         reserves[0] = FiatReserves({currency: CURRENCY_USDT, amount: usdtAs18});
 
-        fundManagerGateway.burnWithReservesDecrease(
+        FUND_MANAGER_GATEWAY.burnWithReservesDecrease(
             msg.sender,
             reserves,
             quote.is21Amount
         );
 
-        usdt.safeTransfer(msg.sender, quote.usdtAmount);
+        USDT.safeTransfer(msg.sender, quote.usdtAmount);
 
         emit BurnExecuted(
             msg.sender,
@@ -337,26 +335,26 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
     ///////////////////////////////////
     // Fund Manager Settlement        //
     ///////////////////////////////////
-    function withdrawUSDT(
+    function withdrawUsdt(
         address to,
         uint256 amount
     ) external onlyFundManager whenNotPaused nonReentrant {
-        if (amount == 0 || amount > availableUSDT)
+        if (amount == 0 || amount > availableUsdt)
             revert IS21SG__InvalidAmount();
 
-        availableUSDT -= amount;
-        usdt.safeTransfer(to, amount);
+        availableUsdt -= amount;
+        USDT.safeTransfer(to, amount);
 
         emit USDTWithdrawn(amount, block.timestamp);
     }
 
-    function depositUSDT(
+    function depositUsdt(
         uint256 amount
     ) external onlyFundManager whenNotPaused nonReentrant {
         if (amount == 0) revert IS21SG__InvalidAmount();
 
-        usdt.safeTransferFrom(msg.sender, address(this), amount);
-        availableUSDT += amount;
+        USDT.safeTransferFrom(msg.sender, address(this), amount);
+        availableUsdt += amount;
 
         emit USDTDeposited(amount, block.timestamp);
     }
@@ -423,6 +421,6 @@ contract IS21USDTSwappingGateway is EIP712, Ownable, Pausable, ReentrancyGuard {
     }
 
     function getFundManagerGateway() external view returns (address) {
-        return address(fundManagerGateway);
+        return address(FUND_MANAGER_GATEWAY);
     }
 }
