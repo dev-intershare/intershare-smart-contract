@@ -6,8 +6,8 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/shared/interfaces/AggregatorV3Interface.sol";
 import {IPyth} from "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
-import {OracleLib} from "./libraries/OracleLib.sol";
-import {TokenConfig} from "./types/ISLoanTypes.sol";
+import {OracleLib} from "../libraries/OracleLib.sol";
+import {TokenConfig} from "../types/ISLoanTypes.sol";
 
 /**
  * @title ISLoanConfig

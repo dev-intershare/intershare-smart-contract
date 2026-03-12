@@ -1,203 +1,312 @@
 # 🏦 InterShare Protocol
 
-**InterShare (IS21)** is a decentralized financial system that bridges **real-world fiat reserves** with **on-chain liquidity and lending**.  
-It consists of two core smart contracts — **IS21Engine** (the fiat-backed reserve token - IS21) and **ISLoanEngine** (the lending and borrowing platform).  
-Together, they create a transparent, collateralized, and risk-managed ecosystem for the next generation of decentralized finance.
+**InterShare (IS21)** is a decentralized financial infrastructure that
+bridges **real-world fiat reserves** with **on-chain financial
+primitives** such as swaps, staking, and lending.
 
----
+The protocol is built around a **fiat-backed reserve currency (IS21)**
+and a modular architecture of gateway contracts that enforce strict
+accounting between **on-chain supply and off-chain reserves**.
 
-## 🔗 Smart Contracts Overview
+InterShare is designed to provide:
 
-The InterShare ecosystem is powered by two foundational smart contracts — **IS21Engine** and **ISLoanEngine** — designed for transparency, collateralization, and real-world integration.
+-   Transparent reserve accounting
+-   Secure minting and redemption flows
+-   Fiat-backed stability
+-   Modular DeFi integrations
 
-### 🪙 IS21Engine
+------------------------------------------------------------------------
 
-Implements the **InterShare21 (IS21)** token — a decentralized, exogenously collateralized reserve currency backed by verified fiat reserves.  
-It provides on-chain accountability and controlled minting/burning through strict role-based permissions.
+# 🧠 Protocol Architecture
 
-**Highlights:**
+The InterShare protocol separates responsibilities into specialized
+smart contracts.
 
-- ERC20 standard with:
-  - [`ERC20Burnable`](https://docs.openzeppelin.com/contracts/5.x/api/token/erc20#ERC20Burnable)
-  - [`ERC20Permit`](https://docs.openzeppelin.com/contracts/5.x/api/token/erc20#ERC20Permit)
-- Role-based access:
-  - **Owner** – manages roles, pausing, and rescue operations
-  - **Fund Managers** – authorized to mint and burn tokens
-  - **Auditors** – verify fiat reserves and proof hashes
-- **Fiat-Backed Reserves:** tracks USD, EUR, ZAR, and other supported currencies
-- **Proof-of-Audit:** stores off-chain audit hashes for transparency
-- **Minting & Redemption:** secure issuance and burning tied to reserve changes
-- **Pausable & Reentrancy-Protected:** compliant with industry-grade safety patterns
-- **Version:** `IS21_VERSION = "1.0.0"`
+### Core Principles
 
-**Verified Contract:** [View on Etherscan](https://etherscan.io/token/0x3619a9103397121B6157859504637689b5C67C3a#code) <br/>
-**Contract Address:** 0x3619a9103397121B6157859504637689b5C67C3a <br/>
-**Source:** [`contracts/IS21Engine.sol`](https://github.com/dev-intershare/intershare-smart-contract/blob/main/src/IS21Engine.sol)
+-   **Exogenous collateralization** -- IS21 is backed by verified
+    off-chain fiat reserves.
+-   **Strict supply control** -- minting and burning must match reserve
+    changes.
+-   **Gateway architecture** -- external integrations cannot mint
+    directly - only an approved gateway/wallet address.
+-   **Auditable reserve proofs** -- auditors publish off-chain reserve
+    verification.
 
----
+------------------------------------------------------------------------
 
-### 💰 ISLoanEngine
+# 🪙 IS21 Token (IS21Engine)
 
-The **InterShare Lending Protocol**, enabling decentralized lending, borrowing, and automated interest accrual.  
-It leverages the IS21 token as a base collateral unit and integrates dual-source oracles for price accuracy.
+`IS21Engine` implements the **InterShare21 reserve currency**.
 
-**Highlights:**
+IS21 is a fiat-backed ERC‑20 token whose supply is controlled by the
+protocol's **Fund Manager Gateway**.
 
-- **Collateralized Lending & Borrowing:** supports multi-asset deposits and loans
-- **Dynamic Health Factor:** real-time solvency monitoring
-- **Interest Accrual:** per-second compounding via supply/borrow indices
-- **Oracle Integration:** Chainlink + Pyth dual-source oracle with fallback
-- **Liquidations:** third-party participants maintain solvency and earn bonuses
-- **Role-Based Governance:** Owner / Fund Manager separation
-- **Pausing & Reentrancy Protection:** all external calls guarded
-- **Comprehensive Test Suite:** 30+ passing unit tests covering all flows
+### Key Features
 
-**Verified Contract:** [View on Etherscan](TBA) <br/>
-**Source:** [`contracts/ISLoanEngine.sol`](https://github.com/dev-intershare/intershare-smart-contract/blob/main/src/ISLoanEngine.sol)
+-   ERC20 token (18 decimals)
+-   ERC20Permit support
+-   Fiat reserve tracking across multiple currencies
+-   Role-based authorization
+-   Reserve proof verification
+-   Minting and burning tied to reserve changes
+-   Pausable emergency controls
+-   Reentrancy protection
 
----
+### Roles
 
-## 📂 Project Structure
+  Role                   Responsibilities
+  ---------------------- -----------------------------------------------
+  Owner                  manages protocol roles and emergency controls
+  Fund Manager Gateway   only contract allowed to mint/burn IS21
+  Auditors               verify reserves and publish proof hashes
+
+------------------------------------------------------------------------
+
+# 🏛 Fund Manager Gateway
+
+`IS21FundManagerGateway` is the **single authorized fund manager** of
+the IS21 token.
+
+It acts as the **accounting layer** between reserve updates and token
+supply.
+
+### Responsibilities
+
+-   Mint IS21 when reserves increase
+-   Burn IS21 when reserves decrease
+-   Synchronize fiat reserves
+-   Authorize protocol contracts to mint/burn
+
+### Atomic Accounting
+
+Reserve changes and mint/burn operations occur **within the same
+transaction** to guarantee consistency.
+
+Example flow:
+
+Reserve Increase → Mint IS21\
+Reserve Decrease → Burn IS21
+
+------------------------------------------------------------------------
+
+# 🔁 USDT Swapping Gateway
+
+`IS21USDTSwappingGateway` handles **user-facing swaps between USDT and
+IS21**.
+
+Swaps require **signed quotes** issued by a trusted signer.
+
+### Mint Flow (USDT → IS21)
+
+1.  User receives a signed quote\
+2.  User sends USDT\
+3.  Gateway increases reserves\
+4.  FundManagerGateway mints IS21
+
+### Burn Flow (IS21 → USDT)
+
+1.  User submits signed quote\
+2.  IS21 is burned\
+3.  Reserves decrease\
+4.  USDT is transferred to the user
+
+### Security Features
+
+-   EIP‑712 signed quotes
+-   Replay protection via nonces
+-   Expiry protection
+-   Liquidity tracking
+-   Pausable gateway
+
+------------------------------------------------------------------------
+
+# 🪙 Yield Vault
+
+`IS21YieldVault` will allow users to **stake IS21 and earn IS21
+rewards**.
+
+The vault is based on the **ERC4626 tokenized vault standard**.
+
+### Features
+
+-   Push-based reward distribution
+-   Streaming rewards
+-   Loyalty multiplier tiers
+-   No lockups
+-   Flash‑loan protection
+
+------------------------------------------------------------------------
+
+# 💰 InterShare Lending (Under Development)
+
+`ISLoanEngine` will power **InterShare Lending**, a decentralized
+lending protocol inspired by systems like Aave.
+
+### Planned Features
+
+-   Multi‑asset collateral deposits
+-   Borrowing against collateral
+-   Interest accrual via supply/borrow indexes
+-   Health factor monitoring
+-   Liquidation mechanisms
+-   Oracle price feeds
+
+------------------------------------------------------------------------
+
+# 📂 Repository Structure
 
 ```
-├── src/
-│   ├── IS21Engine.sol          # Reserve currency contract
-│   ├── ISLoanEngine.sol        # Lending protocol contract
-│   └── libraries/
-│       └── OracleLib.sol       # Chainlink + Pyth oracle integration
+├── src/                    # Solidity source code
 │
-├── script/
-│   ├── DeployIS21Engine.s.sol   # Deployment script for the IS21 ERC-20 contract.
-│   └── DeployISLoanEngine.s.sol # Deployment script for the InterShare lending protocol contract.
+│   ├── gateways/           # Gateways to interact with the main contracts
+│   │   ├── IS21FundManagerGateway.sol
+│   │   └── IS21USDTSwappingGateway.sol
+│   │
+│   ├── vaults/             # IS21 staking vault
+│   │   └── IS21YieldVault.sol
+│   │
+│   ├── libraries/          # Libraries
+│   │   ├── ISLoanEngineCore.sol
+│   │   └── OracleLib.sol
+│   │
+│   ├── types/              # Types
+│   │   └── ISLoanTypes.sol
+│   │
+│   ├── mocks/              # Any mock contracts
+│   │   └── MockUSDT.sol
+│   │
+│   ├── config/             # Any config
+│   │   └── ISLoanConfig.sol
+│   │
+│   ├── IS21Engine.sol      # The main IS21 ERC-20 contract
+│   └── ISLoanEngine.sol # The IS21 lending contract
 │
-├── test/
-│   ├── unit/                   # Unit tests for IS21Engine & ISLoanEngine
-│   └── fuzz/                   # Fuzz tests for stress and edge cases for IS21Engine & ISLoanEngine
-│   └── mocks/                  # Mock files for Oracle tests
+├── script/                 # Solidity deployment scripts
+│   ├── DeployIS21Engine.s.sol
+│   ├── DeployIS21FundManagerGateway.s.sol
+│   ├── DeployIS21USDTSwappingGateway.s.sol
+│   ├── DeployIS21YieldVault.s.sol
+│   ├── DeployIS21LoanEngine.s.sol
+│   └── DeployMockUSDT.s.sol
 │
-└── foundry.toml                # Foundry configuration
+├── scripts/                # Bash deployment scripts (calls the solidity deployment scripts)
+│   ├── _deploy.sh
+│   ├── deploy_is21_engine.sh
+│   ├── deploy_is21_fund_manager_gateway.sh
+│   ├── deploy_is21_usdt_swapping_gateway.sh
+│   ├── deploy_is21_yield_vault.sh
+│   ├── deploy_is_loan_engine.sh
+│   └── deploy_mock_usdt.sh
+│
+├── test/                   # Tests for unit, fuzz and mock testing
+│   ├── unit/
+│   ├── fuzz/
+│   └── mock/
+│
+├── lib/                    # External dependencies (ignored by git)
+├── foundry.toml            # Foundry config
+└── README.md               # This README file
 ```
 
----
+------------------------------------------------------------------------
 
-## ⚡ Getting Started
+# ⚙️ Development
 
-### Prerequisites
+### Install Foundry
 
-- [Foundry](https://getfoundry.sh/) (includes Anvil, Forge, Cast)
-
-Install Foundry:
-
-```bash
-curl -L https://foundry.paradigm.xyz | bash
+```
+curl -L https://foundry.paradigm.xyz \| bash\
 foundryup
 ```
 
-### Install Dependencies
+------------------------------------------------------------------------
 
-```bash
+# 📦 Install Dependencies
+
+Install dependencies
+
+```
 forge install
 ```
 
----
+------------------------------------------------------------------------
 
-## 🚀 Deployments
+# 🚀 Deployments
 
-### Deployment (IS21Engine)
+Deployment scripts are located in the `scripts/` directory.
 
-Deploy locally with Anvil:
+### Local Deployment (Anvil)
 
-```bash
-./deploy_is21.sh anvil
 ```
-
-Deploy to Sepolia testnet:
-
-```bash
-./deploy_is21.sh sepolia
+./scripts/deploy_is21_engine.sh anvil
+./scripts/deploy_is21_fund_manager_gateway.sh anvil
+./scripts/deploy_is21_usdt_swapping_gateway.sh anvil
 ```
+etc.
 
----
+### Sepolia Deployment
 
-### Deployment (ISLoanEngine)
-
-Deploy locally with Anvil:
-
-```bash
-./deploy_is_loan_engine.sh anvil
 ```
-
-Deploy to Sepolia testnet:
-
-```bash
-./deploy_is_loan_engine.sh sepolia
+./scripts/deploy_is21_engine.sh sepolia
+./scripts/deploy_is21_fund_manager_gateway.sh sepolia
+./scripts/deploy_is21_usdt_swapping_gateway.sh sepolia
 ```
+etc.
 
----
+### Mock USDT (testing only)
 
-## 🧪 Testing
+./scripts/deploy_mock_usdt.sh anvil
+
+------------------------------------------------------------------------
+
+# 🧪 Testing
 
 Run all tests:
 
-```bash
-forge test -v
+```
+forge test -vv
 ```
 
-Run specific test:
+Run a specific test:
 
-```bash
-forge test --match-path test/unit/ISLoanEngineTest.t.sol -vvv
+```
+forge test --match-path test/unit/`<TestName>`{=html}.t.sol -vvv
 ```
 
-Run fuzz tests with higher iterations:
+Run fuzz tests:
 
-```bash
-forge test --match-path test/fuzz/IS21EngineFuzz.t.sol -vvvv --fuzz-runs 500
+```
+forge test --match-path test/fuzz -vvvv
 ```
 
-View detailed traces:
+------------------------------------------------------------------------
 
-```bash
-forge test -vvvvv
+# 📊 Coverage
+
+Check testing coverage of contracts
+
 ```
-
----
-
-## 📊 Coverage
-
-Generate coverage report:
-
-```bash
 forge coverage
 ```
 
-Generate coverage report with minimum optimization:
+------------------------------------------------------------------------
 
-```bash
-forge coverage --ir-minimum
-```
+# 🔒 Security
 
-Exclude deployment scripts (configured in `foundry.toml`):
+The protocol incorporates several security mechanisms:
 
-```toml
-[coverage]
-no_match_coverage = "/.*(?i)Deploy.*.s.sol"
-```
+-   Role-based authorization
+-   Reentrancy protection
+-   Pausable emergency controls
+-   Signed swap quotes
+-   Nonce-based replay protection
+-   Atomic reserve accounting
 
----
+------------------------------------------------------------------------
 
-## 🔒 Security & Audit Readiness
+# 📜 License
 
-- ✅ Role-based access control (Owner / FundManager / Auditor)
-- ✅ Reentrancy protection (`nonReentrant`)
-- ✅ Emergency pause mechanisms (`Pausable`)
-- ✅ Oracle freshness verification with dual-source fallback
+MIT License
 
----
-
-## 📜 License
-
-**MIT License**  
-© 2025 **InterShare**
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software.
+© 2025 InterShare

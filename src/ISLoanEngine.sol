@@ -7,7 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {OracleLib} from "./libraries/OracleLib.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {ISLoanConfig} from "./ISLoanConfig.sol";
+import {ISLoanConfig} from "./config/ISLoanConfig.sol";
 import {ISLoanEngineCore} from "./libraries/ISLoanEngineCore.sol";
 import {TokenConfig, AccountData} from "./types/ISLoanTypes.sol";
 

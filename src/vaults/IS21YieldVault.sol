@@ -269,11 +269,6 @@ contract IS21YieldVault is ERC4626, Ownable, Pausable, ReentrancyGuard {
             revert IS21Vault__InvalidReceiver();
         }
 
-        assetsDeposited = previewMint(shares);
-        if (assetsDeposited == 0) {
-            revert IS21Vault__InvalidAmount();
-        }
-
         assetsDeposited = super.mint(shares, receiver);
 
         _increasePrincipalBasis(receiver, assetsDeposited);
@@ -352,15 +347,10 @@ contract IS21YieldVault is ERC4626, Ownable, Pausable, ReentrancyGuard {
         _withdraw(msg.sender, receiver, msg.sender, assets, sharesBurned);
 
         if (balanceOf(msg.sender) == 0) {
-            // Defensive cleanup. In normal conditions, a pure skim should not
-            // fully exhaust a position that still has principal basis.
+            uint256 oldBasis = principalBasis[msg.sender];
             principalBasis[msg.sender] = 0;
             stakeTimestamp[msg.sender] = 0;
-            emit PrincipalBasisUpdated(
-                msg.sender,
-                principalBasis[msg.sender],
-                0
-            );
+            emit PrincipalBasisUpdated(msg.sender, oldBasis, 0);
         }
 
         emit Skimmed(msg.sender, receiver, assets, sharesBurned);
@@ -369,12 +359,9 @@ contract IS21YieldVault is ERC4626, Ownable, Pausable, ReentrancyGuard {
     //////////////////////////
     // Reward Injection
     //////////////////////////
-
-    /// @notice Proper ERC4626 reward injection:
-    /// staker share stays in vault, increasing assets/share.
     function notifyReward(
         uint256 amount
-    ) external nonReentrant onlyAuthorizedCaller whenNotPaused {
+    ) external nonReentrant onlyAuthorizedCaller {
         if (amount == 0) {
             revert IS21Vault__InvalidAmount();
         }
