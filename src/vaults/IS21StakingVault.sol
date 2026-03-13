@@ -19,7 +19,7 @@ import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20P
  *
  * @dev Design summary:
  * - Asset = IS21.
- * - Users deposit IS21 and receive non-transferable ERC4626 vault shares.
+ * - Users deposit IS21 and receive non-transferable ERC4626 vault shares, unless it's a full transfer.
  * - Principal remains in the vault and is withdrawable through ERC4626.
  * - Rewards are added separately by approved reward managers.
  * - Each reward injection is split:
