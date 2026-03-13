@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Script, console} from "forge-std/Script.sol";
-import {IS21YieldVault} from "../src/vaults/IS21YieldVault.sol";
+import {IS21StakingVault} from "../src/vaults/IS21StakingVault.sol";
 
 struct NetworkConfig {
     uint256 deployerKey;
@@ -12,12 +12,12 @@ struct NetworkConfig {
     address stabilityWalletAddress;
 }
 
-contract DeployIS21YieldVault is Script {
-    error DeployIS21YieldVault__UnsupportedNetwork();
-    error DeployIS21YieldVault__OwnerCannotBeZero();
-    error DeployIS21YieldVault__VaultAssetCannotBeZero();
-    error DeployIS21YieldVault__TreasuryWalletCannotBeZero();
-    error DeployIS21YieldVault__StabilityWalletCannotBeZero();
+contract DeployIS21StakingVault is Script {
+    error DeployIS21StakingVault__UnsupportedNetwork();
+    error DeployIS21StakingVault__OwnerCannotBeZero();
+    error DeployIS21StakingVault__VaultAssetCannotBeZero();
+    error DeployIS21StakingVault__TreasuryWalletCannotBeZero();
+    error DeployIS21StakingVault__StabilityWalletCannotBeZero();
 
     function run() external {
         NetworkConfig memory activeNetworkConfig;
@@ -29,36 +29,36 @@ contract DeployIS21YieldVault is Script {
         } else if (block.chainid == 1) {
             activeNetworkConfig = getMainnetEthConfig();
         } else {
-            revert DeployIS21YieldVault__UnsupportedNetwork();
+            revert DeployIS21StakingVault__UnsupportedNetwork();
         }
 
         if (activeNetworkConfig.owner == address(0)) {
-            revert DeployIS21YieldVault__OwnerCannotBeZero();
+            revert DeployIS21StakingVault__OwnerCannotBeZero();
         }
 
         if (activeNetworkConfig.is21Address == address(0)) {
-            revert DeployIS21YieldVault__VaultAssetCannotBeZero();
+            revert DeployIS21StakingVault__VaultAssetCannotBeZero();
         }
 
         if (activeNetworkConfig.treasuryWalletAddress == address(0)) {
-            revert DeployIS21YieldVault__TreasuryWalletCannotBeZero();
+            revert DeployIS21StakingVault__TreasuryWalletCannotBeZero();
         }
 
         if (activeNetworkConfig.stabilityWalletAddress == address(0)) {
-            revert DeployIS21YieldVault__StabilityWalletCannotBeZero();
+            revert DeployIS21StakingVault__StabilityWalletCannotBeZero();
         }
 
-        console.log("------- Deployed IS21YieldVault -------");
+        console.log("------- Deployed IS21StakingVault -------");
         console.log("Deploying to chain ID:", block.chainid);
         vm.startBroadcast(activeNetworkConfig.deployerKey);
-        IS21YieldVault vault = new IS21YieldVault(
+        IS21StakingVault vault = new IS21StakingVault(
             activeNetworkConfig.is21Address,
             activeNetworkConfig.owner,
             activeNetworkConfig.treasuryWalletAddress,
             activeNetworkConfig.stabilityWalletAddress
         );
 
-        console.log("IS21YieldVault deployed to:", address(vault));
+        console.log("IS21StakingVault deployed to:", address(vault));
         vm.stopBroadcast();
     }
 
