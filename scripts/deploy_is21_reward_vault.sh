@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-SCRIPT="script/DeployIS21StakingVault.s.sol:DeployIS21StakingVault"
+SCRIPT="script/DeployIS21RewardVault.s.sol:DeployIS21RewardVault"
 ALLOWED="anvil sepolia mainnet"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
