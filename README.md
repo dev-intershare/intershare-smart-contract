@@ -123,7 +123,7 @@ Swaps require **signed quotes** issued by a trusted signer.
 
 # 🪙 Yield Vault
 
-`IS21YieldVault` will allow users to **stake IS21 and earn IS21
+`IS21RewardVault` will allow users to **stake IS21 and earn IS21
 rewards**.
 
 The vault is based on the **ERC4626 tokenized vault standard**.
@@ -164,30 +164,28 @@ lending protocol inspired by systems like Aave.
 │   │   └── IS21USDTSwappingGateway.sol
 │   │
 │   ├── vaults/             # IS21 staking vault
-│   │   └── IS21YieldVault.sol
+│   │   └── IS21RewardVault.sol
 │   │
 │   ├── libraries/          # Libraries
-│   │   ├── ISLoanEngineCore.sol
-│   │   └── OracleLib.sol
+│   │  
+│   │   
 │   │
 │   ├── types/              # Types
-│   │   └── ISLoanTypes.sol
+│   │   
 │   │
 │   ├── mocks/              # Any mock contracts
 │   │   └── MockUSDT.sol
 │   │
 │   ├── config/             # Any config
-│   │   └── ISLoanConfig.sol
+│   │   
 │   │
-│   ├── IS21Engine.sol      # The main IS21 ERC-20 contract
-│   └── ISLoanEngine.sol # The IS21 lending contract
+│   └── IS21Engine.sol      # The main IS21 ERC-20 contract
 │
 ├── script/                 # Solidity deployment scripts
 │   ├── DeployIS21Engine.s.sol
 │   ├── DeployIS21FundManagerGateway.s.sol
 │   ├── DeployIS21USDTSwappingGateway.s.sol
 │   ├── DeployIS21YieldVault.s.sol
-│   ├── DeployIS21LoanEngine.s.sol
 │   └── DeployMockUSDT.s.sol
 │
 ├── scripts/                # Bash deployment scripts (calls the solidity deployment scripts)
@@ -196,7 +194,6 @@ lending protocol inspired by systems like Aave.
 │   ├── deploy_is21_fund_manager_gateway.sh
 │   ├── deploy_is21_usdt_swapping_gateway.sh
 │   ├── deploy_is21_yield_vault.sh
-│   ├── deploy_is_loan_engine.sh
 │   └── deploy_mock_usdt.sh
 │
 ├── test/                   # Tests for unit, fuzz and mock testing

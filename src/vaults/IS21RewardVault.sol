@@ -105,7 +105,7 @@ contract IS21RewardVault is
     struct UserPosition {
         uint256 principalAssets; // Principal deposited / compounded into vault
         uint256 weightedAssets; // ACTIVE weight for the current epoch
-        uint256 rewardDebt; // informational only in v1.1.0
+        uint256 rewardDebt; // informational only
         uint256 pendingRewards; // settled but unclaimed
         uint64 weightedTimestamp; // weighted average timestamp for principal only
         uint64 lastDepositBlock;
@@ -252,8 +252,9 @@ contract IS21RewardVault is
     }
 
     modifier cannotSendToContract(address to) {
-        if (to == address(this))
+        if (to == address(this)) {
             revert IS21RewardVault__CannotSendToContract();
+        }
         _;
     }
 
@@ -980,12 +981,17 @@ contract IS21RewardVault is
     /**
      * @dev Accrues completed epochs only.
      *
-     * Since all weight changes are queued for next epoch only, between global sync points
-     * there can be at most:
-     * - one ACTIVE weight set for the first unaccrued epoch
-     * - one PENDING weight set for all later unaccrued epochs
+     * CRITICAL FIX:
+     * This version writes accumulator checkpoints for EVERY elapsed epoch boundary.
+     * That guarantees historical reads like:
+     * - acc(lastSettledEpoch)
+     * - acc(lastSettledEpoch + 1)
+     * - acc(currentEpoch)
+     * are always valid for settlement and previews.
      *
-     * So accrual is O(1), not O(number of epochs elapsed).
+     * Weight model remains unchanged:
+     * - first unaccrued epoch uses sTotalWeightedAssets
+     * - all later elapsed epochs use sPendingTotalWeightedAssets
      */
     function _accrueGlobal() internal {
         uint64 currentEpoch = _currentEpoch();
@@ -999,44 +1005,25 @@ contract IS21RewardVault is
         uint256 activeTotal = sTotalWeightedAssets;
         uint256 pendingTotal = sPendingTotalWeightedAssets;
 
-        // First unaccrued epoch uses ACTIVE weight.
-        uint256 emittedFirst = _scheduledRewardsBetween(
-            fromEpoch,
-            fromEpoch + 1
-        );
+        for (uint64 epoch = fromEpoch; epoch < currentEpoch; epoch++) {
+            uint256 epochWeight = epoch == fromEpoch
+                ? activeTotal
+                : pendingTotal;
+            uint256 emitted = _scheduledRewardsBetween(epoch, epoch + 1);
 
-        if (emittedFirst > 0) {
-            if (activeTotal > 0) {
-                acc += (emittedFirst * PRECISION) / activeTotal;
-            } else {
-                sUndistributedRewards += emittedFirst;
-                sTotalReservedRewards -= emittedFirst;
-            }
-        }
-
-        sAccRewardPerWeightedAssetAtEpoch[fromEpoch + 1] = acc;
-
-        // Any remaining elapsed epochs use the queued NEXT weight,
-        // which becomes active after the first boundary and then stays constant.
-        if (currentEpoch > fromEpoch + 1) {
-            uint256 emittedRest = _scheduledRewardsBetween(
-                fromEpoch + 1,
-                currentEpoch
-            );
-
-            if (emittedRest > 0) {
-                if (pendingTotal > 0) {
-                    acc += (emittedRest * PRECISION) / pendingTotal;
+            if (emitted > 0) {
+                if (epochWeight > 0) {
+                    acc += (emitted * PRECISION) / epochWeight;
                 } else {
-                    sUndistributedRewards += emittedRest;
-                    sTotalReservedRewards -= emittedRest;
+                    sUndistributedRewards += emitted;
+                    sTotalReservedRewards -= emitted;
                 }
             }
+
+            sAccRewardPerWeightedAssetAtEpoch[epoch + 1] = acc;
         }
 
         sAccRewardPerWeightedAsset = acc;
-        sAccRewardPerWeightedAssetAtEpoch[currentEpoch] = acc;
-
         sLastAccruedEpoch = currentEpoch;
 
         // After syncing to current epoch, active and pending both equal the

@@ -37,7 +37,7 @@ contract IS21EngineFuzz is Test {
     // Mint / Burn fuzzing
     // --------------------------
 
-    function testFuzz_MintTo_Succeeds_WhenFundManager(
+    function testFuzzMintToSucceedsWhenFundManager(
         address to,
         uint256 amount
     ) public {
@@ -51,7 +51,7 @@ contract IS21EngineFuzz is Test {
         assertEq(engine.totalSupply(), amount);
     }
 
-    function testFuzz_Burn_Succeeds(uint256 mintAmt, uint256 burnAmt) public {
+    function testFuzzBurnSucceeds(uint256 mintAmt, uint256 burnAmt) public {
         mintAmt = bound(mintAmt, 1, type(uint128).max);
         burnAmt = bound(burnAmt, 1, mintAmt); // <-- avoid 0
 
@@ -65,7 +65,7 @@ contract IS21EngineFuzz is Test {
         assertEq(engine.totalSupply(), mintAmt - burnAmt);
     }
 
-    function testFuzz_Mint_Reverts_WhenPaused(uint256 amount) public {
+    function testFuzzMintRevertsWhenPaused(uint256 amount) public {
         amount = bound(amount, 1, type(uint128).max);
 
         vm.prank(owner);
@@ -76,7 +76,7 @@ contract IS21EngineFuzz is Test {
         engine.mintIs21(amount);
     }
 
-    function testFuzz_Burn_Reverts_WhenPaused(uint256 amount) public {
+    function testFuzzBurnRevertsWhenPaused(uint256 amount) public {
         amount = bound(amount, 1, type(uint128).max);
 
         // mint first so we have balance
@@ -96,7 +96,7 @@ contract IS21EngineFuzz is Test {
     // Role restrictions
     // --------------------------
 
-    function testFuzz_OnlyFundManager_CannotMint(
+    function testFuzzOnlyFundManagerCannotMint(
         address notManager,
         uint256 amount
     ) public {
@@ -117,7 +117,7 @@ contract IS21EngineFuzz is Test {
     // Reserves fuzzing
     // --------------------------
 
-    function testFuzz_UpdateSingleReserve_Read(
+    function testFuzzUpdateSingleReserveRead(
         bytes32 currency,
         uint256 amt
     ) public {
@@ -128,7 +128,7 @@ contract IS21EngineFuzz is Test {
         assertEq(engine.getFiatReserve(currency), amt);
     }
 
-    function testFuzz_UpdateMultipleReserves_AndReadArray(
+    function testFuzzUpdateMultipleReservesAndReadArray(
         uint8 lenRaw,
         uint256 seed
     ) public {
@@ -164,7 +164,7 @@ contract IS21EngineFuzz is Test {
     // rescueERC20 fuzzing
     // --------------------------
 
-    function testFuzz_RescueERC20_ByOwner(address to, uint256 amt) public {
+    function testFuzzRescueERC20ByOwner(address to, uint256 amt) public {
         vm.assume(to != address(0));
         vm.assume(to != address(engine)); // prevent self-transfer
 
@@ -187,7 +187,7 @@ contract IS21EngineFuzz is Test {
     // --------------------------
 
     /// Total supply equals sum of all balances we touched (simple spot check for two accounts)
-    function testFuzz_TotalSupplyTracksSimple(
+    function testFuzzTotalSupplyTracksSimple(
         address a,
         address b,
         uint256 x,

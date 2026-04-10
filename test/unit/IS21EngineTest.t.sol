@@ -50,7 +50,7 @@ contract IS21EngineTest is Test {
 
     /* ---------------- Owner / Role control ---------------- */
 
-    function test_RevokeFundManager() public {
+    function testRevokeFundManager() public {
         // Owner revokes manager
         vm.prank(owner);
         engine.revokeFundManager(manager);
@@ -59,19 +59,19 @@ contract IS21EngineTest is Test {
 
     /* ---------------- Mint / Burn ---------------- */
 
-    function test_Mint_ToSelf_viaMintIS21() public {
+    function testMintToSelfViaMintIs21() public {
         vm.prank(manager);
         engine.mintIs21(100 ether);
         assertEq(engine.balanceOf(manager), 100 ether);
     }
 
-    function test_Mint_ToOther_viaMintIs21To() public {
+    function testMintToOtherViaMintIs21To() public {
         vm.prank(manager);
         engine.mintIs21To(user, 777);
         assertEq(engine.balanceOf(user), 777);
     }
 
-    function test_Mint_Reverts_WhenPaused() public {
+    function testMintRevertsWhenPaused() public {
         vm.prank(owner);
         engine.pause();
 
@@ -80,7 +80,7 @@ contract IS21EngineTest is Test {
         engine.mintIs21(1);
     }
 
-    function test_Mint_Reverts_WhenNotFundManager() public {
+    function testMintRevertsWhenNotFundManager() public {
         // Calls external mint which forwards to mintIs21To (onlyFundManager)
         vm.prank(stranger);
         vm.expectRevert(
@@ -91,7 +91,7 @@ contract IS21EngineTest is Test {
         engine.mintIs21(1);
     }
 
-    function test_Mint_Reverts_ZeroAmount() public {
+    function testMintRevertsZeroAmount() public {
         vm.prank(manager);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -101,7 +101,7 @@ contract IS21EngineTest is Test {
         engine.mintIs21(0);
     }
 
-    function test_CannotSendToContract() public {
+    function testCannotSendToContract() public {
         vm.startPrank(manager);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -112,7 +112,7 @@ contract IS21EngineTest is Test {
         vm.stopPrank();
     }
 
-    function test_MintTo_Reverts_ZeroAddress() public {
+    function testMintToRevertsZeroAddress() public {
         vm.prank(manager);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -122,7 +122,7 @@ contract IS21EngineTest is Test {
         engine.mintIs21To(address(0), 1);
     }
 
-    function test_Burn_ByFundManager() public {
+    function testBurnByFundManager() public {
         vm.startPrank(manager);
         engine.mintIs21(1_000);
         engine.burnIs21(250);
@@ -133,7 +133,7 @@ contract IS21EngineTest is Test {
         assertEq(engine.totalSupply(), 750);
     }
 
-    function test_Burn_Reverts_TooMuch() public {
+    function testBurnRevertsTooMuch() public {
         vm.startPrank(manager);
         engine.mintIs21(10);
         vm.expectRevert(
@@ -145,7 +145,7 @@ contract IS21EngineTest is Test {
         vm.stopPrank();
     }
 
-    function test_Burn_Reverts_ZeroAmount() public {
+    function testBurnRevertsZeroAmount() public {
         vm.prank(manager);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -157,13 +157,13 @@ contract IS21EngineTest is Test {
 
     /* ---------------- Auditing / Proof hash ---------------- */
 
-    function test_SetReserveProofHash_ByAuditor() public {
+    function testSetReserveProofHashByAuditor() public {
         vm.prank(auditor);
         engine.setReserveProofHash("ipfs://cid-123");
         assertEq(engine.getLatestReserveProofHash(), "ipfs://cid-123");
     }
 
-    function test_SetReserveProofHash_Revert_NotAuditor() public {
+    function testSetReserveProofHashRevertNotAuditor() public {
         vm.prank(stranger);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -173,7 +173,7 @@ contract IS21EngineTest is Test {
         engine.setReserveProofHash("nope");
     }
 
-    function test_VerifyReserves_EmitsEvent() public {
+    function testVerifyReservesEmitsEvent() public {
         vm.prank(auditor);
         vm.expectEmit(true, false, false, true);
         emit IS21Engine.ReserveVerified(auditor, block.timestamp, "ok");
@@ -182,7 +182,7 @@ contract IS21EngineTest is Test {
 
     /* ---------------- Fiat reserves ---------------- */
 
-    function test_UpdateSingleReserve_AndRead() public {
+    function testUpdateSingleReserveAndRead() public {
         bytes32 usd = bytes32("USD");
         vm.prank(manager);
         vm.expectEmit(true, true, false, true);
@@ -197,7 +197,7 @@ contract IS21EngineTest is Test {
         assertEq(engine.getFiatReserve(usd), 123_45);
     }
 
-    function test_UpdateMultipleReserves_AndReadArray() public {
+    function testUpdateMultipleReservesAndReadArray() public {
         bytes32 usd = bytes32("USD");
         bytes32 eur = bytes32("EUR");
         bytes32 zar = bytes32("ZAR");
@@ -224,7 +224,7 @@ contract IS21EngineTest is Test {
         assertEq(out[2], 300);
     }
 
-    function test_UpdateReserve_Revert_NotFundManager() public {
+    function testUpdateReserveRevertNotFundManager() public {
         vm.prank(stranger);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -236,7 +236,7 @@ contract IS21EngineTest is Test {
 
     /* ---------------- ETH rejection ---------------- */
 
-    function test_Receive_RevertsETH() public {
+    function testReceiveRevertsEth() public {
         (bool ok, bytes memory data) = address(engine).call{value: 1 ether}("");
         assertFalse(ok);
         // Custom error selector check
@@ -244,7 +244,7 @@ contract IS21EngineTest is Test {
         assertEq(sel, IS21Engine.IS21Engine__ETHNotAccepted.selector);
     }
 
-    function test_Fallback_RevertsETH() public {
+    function testFallbackRevertsEth() public {
         // Call with non-empty calldata to trigger fallback
         (bool ok, bytes memory data) = address(engine).call{value: 1 wei}(
             abi.encodeWithSignature("doesNotExist()")
@@ -256,7 +256,7 @@ contract IS21EngineTest is Test {
 
     /* ---------------- Rescue ERC20 ---------------- */
 
-    function test_RescueERC20_ByOwner() public {
+    function testRescueErc20ByOwner() public {
         // Send MOCK to engine, then owner rescues to user
         mock.mint(address(this), 1_000);
         assertTrue(mock.transfer(address(engine), 600));
@@ -269,7 +269,7 @@ contract IS21EngineTest is Test {
         assertEq(mock.balanceOf(user), 600);
     }
 
-    function test_RescueERC20_Revert_ZeroTo() public {
+    function testRescueErc20RevertZeroTo() public {
         mock.mint(address(this), 100);
         assertTrue(mock.transfer(address(engine), 100));
 
@@ -282,7 +282,7 @@ contract IS21EngineTest is Test {
         engine.rescueErc20(address(mock), 100, address(0));
     }
 
-    function test_RescueERC20_Revert_ZeroToken() public {
+    function testRescueErc20RevertZeroToken() public {
         vm.prank(owner);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -292,7 +292,7 @@ contract IS21EngineTest is Test {
         engine.rescueErc20(address(0), 100, user);
     }
 
-    function test_RevokeAuditor_NoOpWhenAlreadyFalse() public {
+    function testRevokeAuditorNoOpWhenAlreadyFalse() public {
         // fresh non-zero address not used/approved anywhere else
         address someone = makeAddr("freshAuditor");
 
@@ -307,7 +307,7 @@ contract IS21EngineTest is Test {
         assertFalse(engine.isAuditor(someone));
     }
 
-    function test_ApproveFundManager_Idempotent() public {
+    function testApproveFundManagerIdempotent() public {
         // first time: sets to true
         vm.prank(owner);
         engine.approveFundManager(manager);
@@ -319,7 +319,7 @@ contract IS21EngineTest is Test {
         assertTrue(engine.isFundManager(manager));
     }
 
-    function test_ApproveAuditor_Idempotent() public {
+    function testApproveAuditorIdempotent() public {
         vm.prank(owner);
         engine.approveAuditor(auditor);
         assertTrue(engine.isAuditor(auditor));
@@ -329,17 +329,17 @@ contract IS21EngineTest is Test {
         assertTrue(engine.isAuditor(auditor));
     }
 
-    function test_VerifyReserves_Reverts_WhenNotAuditor() public {
+    function testVerifyReservesRevertsWhenNotAuditor() public {
         vm.expectRevert(IS21Engine.IS21Engine__OnlyAuditorCanExecute.selector);
         engine.verifyReserves("nope"); // caller is not auditor
     }
 
-    function test_GetFiatReserve_UnknownCurrency_IsZero() public view {
+    function testGetFiatReserveUnknownCurrencyIsZero() public view {
         bytes32 jpy = bytes32("JPY"); // never set
         assertEq(engine.getFiatReserve(jpy), 0);
     }
 
-    function test_UpdateFiatReserves_EmptyArray_NoOp() public {
+    function testUpdateFiatReservesEmptyArrayNoOp() public {
         FiatReserves[] memory empty = new FiatReserves[](0);
 
         vm.prank(owner); // make a fund manager first
@@ -351,20 +351,20 @@ contract IS21EngineTest is Test {
         // nothing to assert; just hitting the path
     }
 
-    function test_GetFiatReserves_EmptyQuery_ReturnsEmpty() public view {
+    function testGetFiatReservesEmptyQueryReturnsEmpty() public view {
         bytes32[] memory empty = new bytes32[](0);
         uint256[] memory out = engine.getFiatReserves(empty);
         assertEq(out.length, 0);
     }
 
-    function test_Burn_Reverts_WhenNotFundManager() public {
+    function testBurnRevertsWhenNotFundManager() public {
         vm.expectRevert(
             IS21Engine.IS21Engine__OnlyFundManagerCanExecute.selector
         );
         engine.burnIs21(1);
     }
 
-    function test_RevokeFundManager_NoOp_WhenAlreadyFalse() public {
+    function testRevokeFundManagerNoOpWhenAlreadyFalse() public {
         address fresh = makeAddr("freshManagerNoOp");
         assertFalse(engine.isFundManager(fresh)); // never approved
         vm.prank(owner);
@@ -372,7 +372,7 @@ contract IS21EngineTest is Test {
         assertFalse(engine.isFundManager(fresh));
     }
 
-    function test_RevokeAuditor_NoOp_WhenAlreadyFalse() public {
+    function testRevokeAuditorNoOpWhenAlreadyFalseAgain() public {
         address fresh = makeAddr("freshAuditorNoOp2");
         assertFalse(engine.isAuditor(fresh)); // never approved
         vm.prank(owner);
@@ -380,7 +380,7 @@ contract IS21EngineTest is Test {
         assertFalse(engine.isAuditor(fresh));
     }
 
-    function test_Transfer_Reverts_WhenPaused() public {
+    function testTransferRevertsWhenPaused() public {
         vm.startPrank(manager);
         engine.mintIs21(100);
         vm.stopPrank();
@@ -395,12 +395,12 @@ contract IS21EngineTest is Test {
 
     /* ---------------- Ownable: constructor & basic ownership ---------------- */
 
-    function test_Owner_IsConstructorParam() public view {
+    function testOwnerIsConstructorParam() public view {
         // Ownable(owner) in constructor
         assertEq(engine.owner(), owner);
     }
 
-    function test_OnlyOwner_CannotBeStranger_OnOwnerOnlyFns() public {
+    function testOnlyOwnerCannotBeStrangerOnOwnerOnlyFns() public {
         // stranger cannot call any onlyOwner function
         vm.startPrank(stranger);
 
@@ -464,7 +464,7 @@ contract IS21EngineTest is Test {
         vm.stopPrank();
     }
 
-    function test_TransferOwnership_EmitsEvent_AndRestrictsAccess() public {
+    function testTransferOwnershipEmitsEventAndRestrictsAccess() public {
         address newOwner = makeAddr("NEW_OWNER");
 
         // Expect Ownable event
@@ -492,7 +492,7 @@ contract IS21EngineTest is Test {
         engine.unpause();
     }
 
-    function test_TransferOwnership_Revert_ZeroAddress() public {
+    function testTransferOwnershipRevertZeroAddress() public {
         vm.prank(owner);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -503,7 +503,7 @@ contract IS21EngineTest is Test {
         engine.transferOwnership(address(0));
     }
 
-    function test_RenounceOwnership_BlocksOwnerOnly() public {
+    function testRenounceOwnershipBlocksOwnerOnly() public {
         // Renounce from the real owner
         vm.prank(owner);
         engine.renounceOwnership();
@@ -541,7 +541,7 @@ contract IS21EngineTest is Test {
 
     /* ---------------- Pause/Unpause events & gating ---------------- */
 
-    function test_Pause_Unpause_OnlyOwner_EmitsOurEvents() public {
+    function testPauseUnpauseOnlyOwnerEmitsOurEvents() public {
         // Pause
         vm.prank(owner);
         vm.expectEmit(true, false, false, true);
@@ -569,7 +569,7 @@ contract IS21EngineTest is Test {
 
     /* ---------------- Rescue ERC20: owner-only & happy path coverage ---------------- */
 
-    function test_RescueERC20_Revert_NotOwner() public {
+    function testRescueErc20RevertNotOwner() public {
         mock.mint(address(this), 100);
         assertTrue(mock.transfer(address(engine), 100));
 
@@ -585,7 +585,7 @@ contract IS21EngineTest is Test {
 
     /* ---------------- Fund manager approval remains after ownership change ---------------- */
 
-    function test_FundManagerApproval_Persists_AfterOwnershipTransfer() public {
+    function testFundManagerApprovalPersistsAfterOwnershipTransfer() public {
         // Owner approves manager2
         vm.prank(owner);
         engine.approveFundManager(manager2);
