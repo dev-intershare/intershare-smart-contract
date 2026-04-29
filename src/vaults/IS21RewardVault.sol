@@ -12,7 +12,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
 /**
- * @title IS21RewardVault
+ * @title IS21RewardVault (Retail)
  * @author InterShare Team
  *
  * @notice Principal-only ERC4626 staking vault for IS21 with separate epoch-based rewards.
@@ -268,7 +268,7 @@ contract IS21RewardVault is
         address stabilityReserveAddress
     )
         ERC4626(IERC20(is21Token))
-        ERC20("Staked InterShare21", "sIS21")
+        ERC20("Retail Staked InterShare21", "rsIS21")
         ERC20Permit("Staked InterShare21")
         Ownable(ownerAddress)
     {

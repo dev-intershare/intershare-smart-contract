@@ -69,10 +69,10 @@ contract DeployIS21RewardVault is Script {
                 owner: vm.envAddress("ANVIL_OWNER_ADDRESS"),
                 is21Address: vm.envAddress("ANVIL_IS21_ADDRESS"),
                 treasuryWalletAddress: vm.envAddress(
-                    "ANVIL_IS21_VAULT_TREASURY_ADDRESS"
+                    "ANVIL_IS21_RETAIL_VAULT_TREASURY_ADDRESS"
                 ),
                 stabilityWalletAddress: vm.envAddress(
-                    "ANVIL_IS21_VAULT_STABILITY_ADDRESS"
+                    "ANVIL_IS21_RETAIL_VAULT_STABILITY_ADDRESS"
                 )
             });
     }
@@ -84,10 +84,10 @@ contract DeployIS21RewardVault is Script {
                 owner: vm.envAddress("SEPOLIA_OWNER_ADDRESS"),
                 is21Address: vm.envAddress("SEPOLIA_IS21_ADDRESS"),
                 treasuryWalletAddress: vm.envAddress(
-                    "SEPOLIA_IS21_VAULT_TREASURY_ADDRESS"
+                    "SEPOLIA_IS21_RETAIL_VAULT_TREASURY_ADDRESS"
                 ),
                 stabilityWalletAddress: vm.envAddress(
-                    "SEPOLIA_IS21_VAULT_STABILITY_ADDRESS"
+                    "SEPOLIA_IS21_RETAIL_VAULT_STABILITY_ADDRESS"
                 )
             });
     }
@@ -99,10 +99,10 @@ contract DeployIS21RewardVault is Script {
                 owner: vm.envAddress("MAINNET_OWNER_ADDRESS"),
                 is21Address: vm.envAddress("MAINNET_IS21_ADDRESS"),
                 treasuryWalletAddress: vm.envAddress(
-                    "MAINNET_IS21_VAULT_TREASURY_ADDRESS"
+                    "MAINNET_IS21_RETAIL_VAULT_TREASURY_ADDRESS"
                 ),
                 stabilityWalletAddress: vm.envAddress(
-                    "MAINNET_IS21_VAULT_STABILITY_ADDRESS"
+                    "MAINNET_IS21_RETAIL_VAULT_STABILITY_ADDRESS"
                 )
             });
     }
