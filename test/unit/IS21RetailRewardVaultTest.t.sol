@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {IS21RewardVault} from "src/vaults/IS21RewardVault.sol";
+import {IS21RetailRewardVault} from "src/vaults/IS21RetailRewardVault.sol";
 
 contract MockIS21 is ERC20 {
     constructor() ERC20("Mock IS21", "mIS21") {}
@@ -15,10 +15,10 @@ contract MockIS21 is ERC20 {
 
 contract DummyReceiver {}
 
-contract IS21RewardVaultTest is Test {
+contract IS21RetailRewardVaultTest is Test {
     MockIS21 internal token;
     MockIS21 internal otherToken;
-    IS21RewardVault internal vault;
+    IS21RetailRewardVault internal vault;
 
     address internal owner = makeAddr("owner");
     address internal treasury = makeAddr("treasury");
@@ -39,7 +39,12 @@ contract IS21RewardVaultTest is Test {
         token = new MockIS21();
         otherToken = new MockIS21();
 
-        vault = new IS21RewardVault(address(token), owner, treasury, stability);
+        vault = new IS21RetailRewardVault(
+            address(token),
+            owner,
+            treasury,
+            stability
+        );
 
         token.mint(alice, START_BALANCE);
         token.mint(bob, START_BALANCE);
@@ -101,26 +106,26 @@ contract IS21RewardVaultTest is Test {
 
     function testConstructorRevertsIfOwnerIsZero() external {
         vm.expectRevert();
-        new IS21RewardVault(address(token), address(0), treasury, stability);
+        new IS21RetailRewardVault(address(token), address(0), treasury, stability);
     }
 
     function testConstructorRevertsIfAssetIsZero() external {
         vm.expectRevert();
-        new IS21RewardVault(address(0), owner, treasury, stability);
+        new IS21RetailRewardVault(address(0), owner, treasury, stability);
     }
 
     function testConstructorRevertsIfTreasuryIsZero() external {
         vm.expectRevert(
-            IS21RewardVault.IS21RewardVault__ZeroAddressNotAllowed.selector
+            IS21RetailRewardVault.IS21RetailRewardVault__ZeroAddressNotAllowed.selector
         );
-        new IS21RewardVault(address(token), owner, address(0), stability);
+        new IS21RetailRewardVault(address(token), owner, address(0), stability);
     }
 
     function testConstructorRevertsIfStabilityIsZero() external {
         vm.expectRevert(
-            IS21RewardVault.IS21RewardVault__ZeroAddressNotAllowed.selector
+            IS21RetailRewardVault.IS21RetailRewardVault__ZeroAddressNotAllowed.selector
         );
-        new IS21RewardVault(address(token), owner, treasury, address(0));
+        new IS21RetailRewardVault(address(token), owner, treasury, address(0));
     }
 
     function testInitialState() external view {
@@ -229,7 +234,7 @@ contract IS21RewardVaultTest is Test {
 
         _aliceDeposit(DEPOSIT_AMOUNT);
 
-        IS21RewardVault.UserPosition memory user = vault.getUserPosition(alice);
+        IS21RetailRewardVault.UserPosition memory user = vault.getUserPosition(alice);
 
         assertEq(vault.totalAssets(), DEPOSIT_AMOUNT);
         assertEq(vault.balanceOf(alice), DEPOSIT_AMOUNT);
@@ -252,7 +257,7 @@ contract IS21RewardVaultTest is Test {
         vm.prank(alice);
         vault.deposit(600 ether, alice);
 
-        IS21RewardVault.UserPosition memory user = vault.getUserPosition(alice);
+        IS21RetailRewardVault.UserPosition memory user = vault.getUserPosition(alice);
 
         uint256 expectedTs = ((400 ether * uint256(firstTs)) +
             (600 ether * block.timestamp)) / 1000 ether;
@@ -285,7 +290,7 @@ contract IS21RewardVaultTest is Test {
         vm.prank(alice);
         vault.withdraw(DEPOSIT_AMOUNT, alice, alice);
 
-        IS21RewardVault.UserPosition memory user = vault.getUserPosition(alice);
+        IS21RetailRewardVault.UserPosition memory user = vault.getUserPosition(alice);
 
         assertEq(vault.totalAssets(), 0);
         assertEq(vault.balanceOf(alice), 0);
@@ -302,7 +307,7 @@ contract IS21RewardVaultTest is Test {
         _aliceDeposit(DEPOSIT_AMOUNT);
 
         vm.expectRevert(
-            IS21RewardVault.IS21RewardVault__ShareTransfersDisabled.selector
+            IS21RetailRewardVault.IS21RetailRewardVault__ShareTransfersDisabled.selector
         );
         vm.prank(alice);
         (bool success, ) = address(vault).call(
@@ -315,7 +320,7 @@ contract IS21RewardVaultTest is Test {
         _aliceDeposit(DEPOSIT_AMOUNT);
 
         vm.expectRevert(
-            IS21RewardVault.IS21RewardVault__CannotSendToContract.selector
+            IS21RetailRewardVault.IS21RetailRewardVault__CannotSendToContract.selector
         );
         vm.prank(alice);
         (bool success, ) = address(vault).call(
@@ -333,8 +338,8 @@ contract IS21RewardVaultTest is Test {
         _warpEpochs(1);
 
         vm.expectRevert(
-            IS21RewardVault
-                .IS21RewardVault__OnlyRewardManagerCanExecute
+            IS21RetailRewardVault
+                .IS21RetailRewardVault__OnlyRewardManagerCanExecute
                 .selector
         );
         vm.prank(alice);
@@ -346,7 +351,7 @@ contract IS21RewardVaultTest is Test {
         _warpEpochs(1);
 
         vm.expectRevert(
-            IS21RewardVault.IS21RewardVault__InvalidEpochCount.selector
+            IS21RetailRewardVault.IS21RetailRewardVault__InvalidEpochCount.selector
         );
         vm.prank(rewardManager);
         vault.addRewards(REWARD_AMOUNT, 0);
@@ -356,7 +361,7 @@ contract IS21RewardVaultTest is Test {
         _aliceDeposit(DEPOSIT_AMOUNT);
 
         vm.expectRevert(
-            IS21RewardVault.IS21RewardVault__NoActiveStakers.selector
+            IS21RetailRewardVault.IS21RetailRewardVault__NoActiveStakers.selector
         );
         vm.prank(rewardManager);
         vault.addRewards(REWARD_AMOUNT, 4);
@@ -371,7 +376,7 @@ contract IS21RewardVaultTest is Test {
 
         _addRewards(REWARD_AMOUNT, 4);
 
-        IS21RewardVault.RewardStream memory stream = vault.getRewardStream();
+        IS21RetailRewardVault.RewardStream memory stream = vault.getRewardStream();
 
         uint256 treasuryCut = 10 ether;
         uint256 reserveCut = 2 ether;
@@ -394,7 +399,7 @@ contract IS21RewardVaultTest is Test {
         _warpEpochs(1);
         _addRewards(100 ether, 2);
 
-        IS21RewardVault.RewardStream memory stream = vault.getRewardStream();
+        IS21RetailRewardVault.RewardStream memory stream = vault.getRewardStream();
 
         assertEq(stream.startEpoch, 2);
         assertEq(stream.endEpoch, 4);
@@ -437,7 +442,7 @@ contract IS21RewardVaultTest is Test {
         vm.prank(alice);
         uint256 claimed = vault.claimRewards();
 
-        IS21RewardVault.UserPosition memory user = vault.getUserPosition(alice);
+        IS21RetailRewardVault.UserPosition memory user = vault.getUserPosition(alice);
 
         assertEq(claimed, 44 ether);
         assertEq(token.balanceOf(alice), aliceBalBefore + 44 ether);
@@ -466,8 +471,8 @@ contract IS21RewardVaultTest is Test {
         vm.roll(block.number + 1);
 
         vm.expectRevert(
-            IS21RewardVault
-                .IS21RewardVault__InsufficientClaimableRewards
+            IS21RetailRewardVault
+                .IS21RetailRewardVault__InsufficientClaimableRewards
                 .selector
         );
         vm.prank(alice);
@@ -478,7 +483,7 @@ contract IS21RewardVaultTest is Test {
         _aliceDeposit(DEPOSIT_AMOUNT);
 
         vm.expectRevert(
-            IS21RewardVault.IS21RewardVault__SameBlockClaimNotAllowed.selector
+            IS21RetailRewardVault.IS21RetailRewardVault__SameBlockClaimNotAllowed.selector
         );
         vm.prank(alice);
         vault.claimRewards();
@@ -490,7 +495,7 @@ contract IS21RewardVaultTest is Test {
         vm.roll(block.number + 1);
 
         vm.expectRevert(
-            IS21RewardVault.IS21RewardVault__CannotSendToContract.selector
+            IS21RetailRewardVault.IS21RetailRewardVault__CannotSendToContract.selector
         );
         vm.prank(alice);
         vault.claimRewardsTo(address(vault));
@@ -510,7 +515,7 @@ contract IS21RewardVaultTest is Test {
         vm.prank(alice);
         (uint256 compounded, uint256 mintedShares) = vault.compoundRewards();
 
-        IS21RewardVault.UserPosition memory user = vault.getUserPosition(alice);
+        IS21RetailRewardVault.UserPosition memory user = vault.getUserPosition(alice);
 
         assertEq(compounded, 22 ether);
         assertEq(mintedShares, 22 ether);
@@ -531,7 +536,7 @@ contract IS21RewardVaultTest is Test {
             10 ether
         );
 
-        IS21RewardVault.UserPosition memory user = vault.getUserPosition(alice);
+        IS21RetailRewardVault.UserPosition memory user = vault.getUserPosition(alice);
 
         assertEq(compounded, 10 ether);
         assertEq(mintedShares, 10 ether);
@@ -547,8 +552,8 @@ contract IS21RewardVaultTest is Test {
         vm.roll(block.number + 1);
 
         vm.expectRevert(
-            IS21RewardVault
-                .IS21RewardVault__AmountExceedsClaimableRewards
+            IS21RetailRewardVault
+                .IS21RetailRewardVault__AmountExceedsClaimableRewards
                 .selector
         );
         vm.prank(alice);
@@ -560,8 +565,8 @@ contract IS21RewardVaultTest is Test {
         vm.roll(block.number + 1);
 
         vm.expectRevert(
-            IS21RewardVault
-                .IS21RewardVault__InsufficientClaimableRewards
+            IS21RetailRewardVault
+                .IS21RetailRewardVault__InsufficientClaimableRewards
                 .selector
         );
         vm.prank(alice);
@@ -572,8 +577,8 @@ contract IS21RewardVaultTest is Test {
         _aliceDeposit(DEPOSIT_AMOUNT);
 
         vm.expectRevert(
-            IS21RewardVault
-                .IS21RewardVault__SameBlockCompoundNotAllowed
+            IS21RetailRewardVault
+                .IS21RetailRewardVault__SameBlockCompoundNotAllowed
                 .selector
         );
         vm.prank(alice);
@@ -623,7 +628,7 @@ contract IS21RewardVaultTest is Test {
         vm.prank(alice);
         vault.refreshPosition();
 
-        IS21RewardVault.UserPosition memory user = vault.getUserPosition(alice);
+        IS21RetailRewardVault.UserPosition memory user = vault.getUserPosition(alice);
 
         assertEq(user.weightedAssets, DEPOSIT_AMOUNT);
         assertEq(vault.getTotalWeightedAssets(), DEPOSIT_AMOUNT);
@@ -678,8 +683,8 @@ contract IS21RewardVaultTest is Test {
 
     function testWithdrawUndistributedRewardsRevertsIfTooMuch() external {
         vm.expectRevert(
-            IS21RewardVault
-                .IS21RewardVault__InsufficientUndistributedRewards
+            IS21RetailRewardVault
+                .IS21RetailRewardVault__InsufficientUndistributedRewards
                 .selector
         );
         vm.prank(rewardManager);
@@ -721,8 +726,8 @@ contract IS21RewardVaultTest is Test {
         _aliceDeposit(DEPOSIT_AMOUNT);
 
         vm.expectRevert(
-            IS21RewardVault
-                .IS21RewardVault__InsufficientFreeBalanceForRescue
+            IS21RetailRewardVault
+                .IS21RetailRewardVault__InsufficientFreeBalanceForRescue
                 .selector
         );
         vm.prank(owner);
@@ -737,7 +742,7 @@ contract IS21RewardVaultTest is Test {
         _aliceDeposit(DEPOSIT_AMOUNT);
 
         vm.expectRevert(
-            IS21RewardVault.IS21RewardVault__CannotTransferToSelf.selector
+            IS21RetailRewardVault.IS21RetailRewardVault__CannotTransferToSelf.selector
         );
         vm.prank(alice);
         vault.transferFullPosition(alice);
@@ -750,7 +755,7 @@ contract IS21RewardVaultTest is Test {
         vm.roll(block.number + 1);
 
         vm.expectRevert(
-            IS21RewardVault.IS21RewardVault__ReceiverMustBeEmpty.selector
+            IS21RetailRewardVault.IS21RetailRewardVault__ReceiverMustBeEmpty.selector
         );
         vm.prank(alice);
         vault.transferFullPosition(bob);
@@ -763,7 +768,7 @@ contract IS21RewardVaultTest is Test {
         vm.prank(alice);
         vault.refreshPosition();
 
-        IS21RewardVault.UserPosition memory beforeAlice = vault.getUserPosition(
+        IS21RetailRewardVault.UserPosition memory beforeAlice = vault.getUserPosition(
             alice
         );
         uint256 shares = vault.balanceOf(alice);
@@ -772,10 +777,10 @@ contract IS21RewardVaultTest is Test {
         vm.prank(alice);
         vault.transferFullPosition(bob);
 
-        IS21RewardVault.UserPosition memory afterAlice = vault.getUserPosition(
+        IS21RetailRewardVault.UserPosition memory afterAlice = vault.getUserPosition(
             alice
         );
-        IS21RewardVault.UserPosition memory afterBob = vault.getUserPosition(
+        IS21RetailRewardVault.UserPosition memory afterBob = vault.getUserPosition(
             bob
         );
 
@@ -799,14 +804,14 @@ contract IS21RewardVaultTest is Test {
 
     function testReceiveReverts() external {
         vm.expectRevert(
-            IS21RewardVault.IS21RewardVault__ETHNotAccepted.selector
+            IS21RetailRewardVault.IS21RetailRewardVault__ETHNotAccepted.selector
         );
         payable(address(vault)).transfer(1 ether);
     }
 
     function testFallbackReverts() external {
         vm.expectRevert(
-            IS21RewardVault.IS21RewardVault__ETHNotAccepted.selector
+            IS21RetailRewardVault.IS21RetailRewardVault__ETHNotAccepted.selector
         );
         (bool ok, ) = address(vault).call{value: 1 ether}(
             abi.encodeWithSignature("doesNotExist()")

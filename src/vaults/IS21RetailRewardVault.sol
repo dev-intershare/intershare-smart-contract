@@ -12,7 +12,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
 /**
- * @title IS21RewardVault (Retail)
+ * @title IS21RetailRewardVault (Retail)
  * @author InterShare Team
  *
  * @notice Principal-only ERC4626 staking vault for IS21 with separate epoch-based rewards.
@@ -48,7 +48,7 @@ import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20P
  *   apply to the NEXT epoch only.
  * - Reward tokens remain inside the vault contract until claimed or compounded.
  */
-contract IS21RewardVault is
+contract IS21RetailRewardVault is
     ERC4626,
     ERC20Permit,
     ERC20Pausable,
@@ -61,24 +61,24 @@ contract IS21RewardVault is
     ///////////////
     // Errors    //
     ///////////////
-    error IS21RewardVault__AmountMustBeMoreThanZero();
-    error IS21RewardVault__ZeroAddressNotAllowed();
-    error IS21RewardVault__ETHNotAccepted();
-    error IS21RewardVault__CannotSendToContract();
-    error IS21RewardVault__OnlyRewardManagerCanExecute();
-    error IS21RewardVault__InvalidEpochCount();
-    error IS21RewardVault__InsufficientClaimableRewards();
-    error IS21RewardVault__SameBlockWithdrawNotAllowed();
-    error IS21RewardVault__SameBlockClaimNotAllowed();
-    error IS21RewardVault__SameBlockCompoundNotAllowed();
-    error IS21RewardVault__ShareTransfersDisabled();
-    error IS21RewardVault__InsufficientFreeBalanceForRescue();
-    error IS21RewardVault__RewardAddressesNotConfigured();
-    error IS21RewardVault__InsufficientUndistributedRewards();
-    error IS21RewardVault__ReceiverMustBeEmpty();
-    error IS21RewardVault__CannotTransferToSelf();
-    error IS21RewardVault__AmountExceedsClaimableRewards();
-    error IS21RewardVault__NoActiveStakers();
+    error IS21RetailRewardVault__AmountMustBeMoreThanZero();
+    error IS21RetailRewardVault__ZeroAddressNotAllowed();
+    error IS21RetailRewardVault__ETHNotAccepted();
+    error IS21RetailRewardVault__CannotSendToContract();
+    error IS21RetailRewardVault__OnlyRewardManagerCanExecute();
+    error IS21RetailRewardVault__InvalidEpochCount();
+    error IS21RetailRewardVault__InsufficientClaimableRewards();
+    error IS21RetailRewardVault__SameBlockWithdrawNotAllowed();
+    error IS21RetailRewardVault__SameBlockClaimNotAllowed();
+    error IS21RetailRewardVault__SameBlockCompoundNotAllowed();
+    error IS21RetailRewardVault__ShareTransfersDisabled();
+    error IS21RetailRewardVault__InsufficientFreeBalanceForRescue();
+    error IS21RetailRewardVault__RewardAddressesNotConfigured();
+    error IS21RetailRewardVault__InsufficientUndistributedRewards();
+    error IS21RetailRewardVault__ReceiverMustBeEmpty();
+    error IS21RetailRewardVault__CannotTransferToSelf();
+    error IS21RetailRewardVault__AmountExceedsClaimableRewards();
+    error IS21RetailRewardVault__NoActiveStakers();
 
     /////////////////////
     // State Variables //
@@ -234,26 +234,26 @@ contract IS21RewardVault is
     // Modifiers //
     ///////////////
     modifier moreThanZero(uint256 amount) {
-        if (amount == 0) revert IS21RewardVault__AmountMustBeMoreThanZero();
+        if (amount == 0) revert IS21RetailRewardVault__AmountMustBeMoreThanZero();
         _;
     }
 
     modifier nonZeroAddress(address account) {
         if (account == address(0))
-            revert IS21RewardVault__ZeroAddressNotAllowed();
+            revert IS21RetailRewardVault__ZeroAddressNotAllowed();
         _;
     }
 
     modifier onlyRewardManager() {
         if (!sRewardManagers.contains(msg.sender)) {
-            revert IS21RewardVault__OnlyRewardManagerCanExecute();
+            revert IS21RetailRewardVault__OnlyRewardManagerCanExecute();
         }
         _;
     }
 
     modifier cannotSendToContract(address to) {
         if (to == address(this)) {
-            revert IS21RewardVault__CannotSendToContract();
+            revert IS21RetailRewardVault__CannotSendToContract();
         }
         _;
     }
@@ -278,7 +278,7 @@ contract IS21RewardVault is
             treasuryAddress == address(0) ||
             stabilityReserveAddress == address(0)
         ) {
-            revert IS21RewardVault__ZeroAddressNotAllowed();
+            revert IS21RetailRewardVault__ZeroAddressNotAllowed();
         }
 
         treasuryWallet = treasuryAddress;
@@ -582,18 +582,18 @@ contract IS21RewardVault is
         whenNotPaused
     {
         if (epochCount == 0) {
-            revert IS21RewardVault__InvalidEpochCount();
+            revert IS21RetailRewardVault__InvalidEpochCount();
         }
 
         if (treasuryWallet == address(0) || stabilityWallet == address(0)) {
-            revert IS21RewardVault__RewardAddressesNotConfigured();
+            revert IS21RetailRewardVault__RewardAddressesNotConfigured();
         }
 
         _accrueGlobal();
 
         // Require active stakers for the stream's starting epoch.
         if (sTotalWeightedAssets == 0) {
-            revert IS21RewardVault__NoActiveStakers();
+            revert IS21RetailRewardVault__NoActiveStakers();
         }
 
         IERC20 assetToken = IERC20(asset());
@@ -616,7 +616,7 @@ contract IS21RewardVault is
         uint256 totalForNewStream = leftover + stakerAmount;
 
         if (totalForNewStream == 0) {
-            revert IS21RewardVault__AmountMustBeMoreThanZero();
+            revert IS21RetailRewardVault__AmountMustBeMoreThanZero();
         }
 
         uint256 rewardPerEpoch = totalForNewStream / epochCount;
@@ -753,7 +753,7 @@ contract IS21RewardVault is
         _accrueGlobal();
 
         if (amount > sUndistributedRewards) {
-            revert IS21RewardVault__InsufficientUndistributedRewards();
+            revert IS21RetailRewardVault__InsufficientUndistributedRewards();
         }
 
         sUndistributedRewards -= amount;
@@ -786,7 +786,7 @@ contract IS21RewardVault is
                 : 0;
 
             if (amount > freeBalance) {
-                revert IS21RewardVault__InsufficientFreeBalanceForRescue();
+                revert IS21RetailRewardVault__InsufficientFreeBalanceForRescue();
             }
         }
 
@@ -806,16 +806,16 @@ contract IS21RewardVault is
         cannotSendToContract(to)
     {
         if (to == msg.sender) {
-            revert IS21RewardVault__CannotTransferToSelf();
+            revert IS21RetailRewardVault__CannotTransferToSelf();
         }
 
         if (!_isEmptyPosition(to)) {
-            revert IS21RewardVault__ReceiverMustBeEmpty();
+            revert IS21RetailRewardVault__ReceiverMustBeEmpty();
         }
 
         uint256 sharesToMove = balanceOf(msg.sender);
         if (sharesToMove == 0) {
-            revert IS21RewardVault__AmountMustBeMoreThanZero();
+            revert IS21RetailRewardVault__AmountMustBeMoreThanZero();
         }
 
         _accrueGlobal();
@@ -873,11 +873,11 @@ contract IS21RewardVault is
     }
 
     receive() external payable {
-        revert IS21RewardVault__ETHNotAccepted();
+        revert IS21RetailRewardVault__ETHNotAccepted();
     }
 
     fallback() external payable {
-        revert IS21RewardVault__ETHNotAccepted();
+        revert IS21RetailRewardVault__ETHNotAccepted();
     }
 
     ////////////////////////////////////
@@ -935,7 +935,7 @@ contract IS21RewardVault is
         UserPosition storage user = sUserPositions[owner_];
 
         if (user.lastDepositBlock == uint64(block.number)) {
-            revert IS21RewardVault__SameBlockWithdrawNotAllowed();
+            revert IS21RetailRewardVault__SameBlockWithdrawNotAllowed();
         }
 
         _accrueGlobal();
@@ -968,7 +968,7 @@ contract IS21RewardVault is
             to != address(0) &&
             !sPositionTransferInProgress
         ) {
-            revert IS21RewardVault__ShareTransfersDisabled();
+            revert IS21RetailRewardVault__ShareTransfersDisabled();
         }
 
         super._update(from, to, value);
@@ -1148,7 +1148,7 @@ contract IS21RewardVault is
             user.lastDepositBlock == uint64(block.number) ||
             user.lastWithdrawBlock == uint64(block.number)
         ) {
-            revert IS21RewardVault__SameBlockClaimNotAllowed();
+            revert IS21RetailRewardVault__SameBlockClaimNotAllowed();
         }
 
         _accrueGlobal();
@@ -1156,7 +1156,7 @@ contract IS21RewardVault is
 
         claimed = user.pendingRewards;
         if (claimed == 0) {
-            revert IS21RewardVault__InsufficientClaimableRewards();
+            revert IS21RetailRewardVault__InsufficientClaimableRewards();
         }
 
         user.pendingRewards = 0;
@@ -1186,7 +1186,7 @@ contract IS21RewardVault is
             user.lastDepositBlock == uint64(block.number) ||
             user.lastWithdrawBlock == uint64(block.number)
         ) {
-            revert IS21RewardVault__SameBlockCompoundNotAllowed();
+            revert IS21RetailRewardVault__SameBlockCompoundNotAllowed();
         }
 
         _accrueGlobal();
@@ -1194,14 +1194,14 @@ contract IS21RewardVault is
 
         uint256 claimable = user.pendingRewards;
         if (claimable == 0) {
-            revert IS21RewardVault__InsufficientClaimableRewards();
+            revert IS21RetailRewardVault__InsufficientClaimableRewards();
         }
 
         compounded = requestedAmount > claimable ? claimable : requestedAmount;
         if (
             requestedAmount != type(uint256).max && requestedAmount > claimable
         ) {
-            revert IS21RewardVault__AmountExceedsClaimableRewards();
+            revert IS21RetailRewardVault__AmountExceedsClaimableRewards();
         }
 
         // Preview shares before principal grows.
