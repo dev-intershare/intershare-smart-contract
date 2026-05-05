@@ -73,7 +73,8 @@ contract MockUSDTTest is Test {
     function testTransferRevertsWhenInsufficientBalance() public {
         vm.prank(user);
         vm.expectRevert();
-        usdt.transfer(stranger, 1);
+        bool success = usdt.transfer(stranger, 1);
+        success;
     }
 
     function testApproveAndTransferFrom() public {
@@ -100,7 +101,8 @@ contract MockUSDTTest is Test {
 
         vm.prank(stranger);
         vm.expectRevert();
-        usdt.transferFrom(user, stranger, 1);
+        bool success = usdt.transferFrom(user, stranger, 1);
+        success;
     }
 
     function testTransferFromRevertsWhenAllowanceTooLow() public {
@@ -108,11 +110,13 @@ contract MockUSDTTest is Test {
         usdt.mint(user, 1_000_000);
 
         vm.prank(user);
-        usdt.approve(stranger, 100_000);
+        bool approved = usdt.approve(stranger, 100_000);
+        assertTrue(approved);
 
         vm.prank(stranger);
         vm.expectRevert();
-        usdt.transferFrom(user, stranger, 100_001);
+        bool success = usdt.transferFrom(user, stranger, 100_001);
+        success;
     }
 
     function testOwnerCanTransferOwnership() public {

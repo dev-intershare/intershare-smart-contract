@@ -21,4 +21,7 @@ echo "Deploying IS21UsdtSwappingGateway..."
 echo "Deploying IS21RetailRewardVault..."
 "$SCRIPT_DIR/deploy_is21_retail_reward_vault.sh" anvil "$SIMULATE"
 
+echo "Deploying IS21InstitutionalRewardVault..."
+"$SCRIPT_DIR/deploy_is21_institutional_reward_vault.sh" anvil "$SIMULATE"
+
 echo "✅ Ordered anvil deployment complete."

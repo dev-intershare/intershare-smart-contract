@@ -801,6 +801,10 @@ contract IS21InstitutionalRewardVault is
         address receiver,
         address owner_
     ) public override nonReentrant whenNotPaused returns (uint256) {
+        if (sLastDepositBlock[owner_] == uint64(block.number)) {
+            revert IS21InstitutionalRewardVault__SameBlockWithdrawNotAllowed();
+        }
+
         return super.withdraw(assets, receiver, owner_);
     }
 
@@ -809,6 +813,10 @@ contract IS21InstitutionalRewardVault is
         address receiver,
         address owner_
     ) public override nonReentrant whenNotPaused returns (uint256) {
+        if (sLastDepositBlock[owner_] == uint64(block.number)) {
+            revert IS21InstitutionalRewardVault__SameBlockWithdrawNotAllowed();
+        }
+
         return super.redeem(shares, receiver, owner_);
     }
 
