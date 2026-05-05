@@ -83,7 +83,7 @@ contract IS21RetailRewardVault is
     /////////////////////
     // State Variables //
     /////////////////////
-    string public constant IS21_STAKING_VAULT_VERSION = "1.0.1";
+    string public constant IS21_STAKING_VAULT_VERSION = "1.0.0";
 
     uint256 private constant PRECISION = 1e18;
     uint256 private constant BPS = 10_000;
@@ -269,7 +269,7 @@ contract IS21RetailRewardVault is
     )
         ERC4626(IERC20(is21Token))
         ERC20("Retail Staked InterShare21", "rsIS21")
-        ERC20Permit("Retail Staked InterShare21")
+        ERC20Permit("Staked InterShare21")
         Ownable(ownerAddress)
     {
         if (

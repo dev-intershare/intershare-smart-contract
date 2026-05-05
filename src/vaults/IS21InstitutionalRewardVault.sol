@@ -21,21 +21,29 @@ import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20P
  * - Asset = IS21.
  * - Vault share token = isIS21, Institutional Staked InterShare21.
  * - Institutions are whitelisted before they may deposit or mint.
- * - This is a pure shares-based vault: rewards increase ERC4626 share price.
+ * - This is a pure shares-based vault: streamed rewards increase ERC4626 share price over time.
  * - No loyalty multipliers.
  * - No manual claim function.
  * - No manual compound function.
- * - Reward managers add IS21 rewards directly into the vault.
+ * - Reward managers add IS21 rewards into a scheduled stream.
  * - Reward split:
  *   - 10% treasury
  *   - 2% stability reserve
  *   - 88% institutional vault rewards
- * - Institutional rewards remain in the vault and increase assets per share.
+ * - Institutional rewards stay in the vault but are excluded from totalAssets() until vested by epoch.
  * - Minimum position threshold is configurable, default 150,000 IS21.
  * - Withdrawal penalty period is configurable, default 30 days.
  * - If a partial withdrawal would leave the institution below the minimum position,
  *   the transaction reverts and the institution must fully exit instead.
  * - Shares are non-transferable except for controlled full-position transfers.
+ * - Each institution's net principal is tracked for frontend profitability reporting.
+ *
+ * @dev Reward streaming model:
+ * - EPOCH_DURATION = 1 hour.
+ * - Only one active reward stream exists at a time.
+ * - When new rewards are added, remaining unvested scheduled rewards are rolled into the new stream.
+ * - totalAssets() excludes remaining scheduled rewards so unvested rewards do not affect share price.
+ * - As epochs pass, scheduled rewards become vested automatically because remainingScheduledRewards falls.
  *
  * @dev Penalty model:
  * - Penalty applies only to withdrawals/redeems before the user's weighted deposit age
@@ -68,11 +76,14 @@ contract IS21InstitutionalRewardVault is
     error IS21InstitutionalRewardVault__MinimumDepositNotMet();
     error IS21InstitutionalRewardVault__RemainingBalanceBelowMinimum();
     error IS21InstitutionalRewardVault__InvalidBps();
+    error IS21InstitutionalRewardVault__InvalidEpochCount();
     error IS21InstitutionalRewardVault__RewardAddressesNotConfigured();
     error IS21InstitutionalRewardVault__InsufficientFreeBalanceForRescue();
     error IS21InstitutionalRewardVault__ShareTransfersDisabled();
     error IS21InstitutionalRewardVault__ReceiverMustBeEmpty();
     error IS21InstitutionalRewardVault__CannotTransferToSelf();
+    error IS21InstitutionalRewardVault__NoActiveInstitutionShares();
+    error IS21InstitutionalRewardVault__SameBlockWithdrawNotAllowed();
 
     /////////////////////
     // State Variables //
@@ -84,13 +95,37 @@ contract IS21InstitutionalRewardVault is
     uint256 private constant STABILITY_RESERVE_BPS = 200; // 2%
     uint256 private constant DEFAULT_MINIMUM_POSITION = 150_000 ether;
     uint256 private constant DEFAULT_WITHDRAWAL_PENALTY_PERIOD = 30 days;
+    uint64 private constant EPOCH_DURATION = 1 hours;
+
+    uint64 private immutable EPOCH_ZERO_TIMESTAMP;
+
+    struct InstitutionPosition {
+        uint256 principalDeposited; // Net principal after proportional withdrawal reductions
+        uint256 currentAssets; // Current ERC4626 asset value before withdrawal penalties
+        int256 unrealizedProfitLoss; // currentAssets - principalDeposited
+        uint256 shareBalance;
+        uint64 weightedDepositTimestamp;
+        uint64 lastDepositBlock;
+        bool whitelisted;
+        bool withinPenaltyPeriod;
+    }
+
+    struct RewardStream {
+        uint64 startEpoch; // inclusive
+        uint64 endEpoch; // exclusive
+        uint256 rewardPerEpoch;
+        uint256 firstEpochBonus;
+    }
 
     EnumerableSet.AddressSet private sFundManagers;
     EnumerableSet.AddressSet private sRewardManagers;
     EnumerableSet.AddressSet private sWhitelistedInstitutions;
 
+    mapping(address => uint256) private sPrincipalDeposited;
     mapping(address => uint64) private sWeightedDepositTimestamp;
     mapping(address => uint64) private sLastDepositBlock;
+
+    RewardStream private sRewardStream;
 
     bool private sPositionTransferInProgress;
 
@@ -99,7 +134,7 @@ contract IS21InstitutionalRewardVault is
 
     uint256 private sMinimumPositionAssets;
     uint256 private sWithdrawalPenaltyPeriod;
-    uint256 private sWithdrawalPenaltyBps;
+    uint256 private sWithdrawalPenaltyBps; // 10 bps = 0.1%, 500 bps = 5.0%
 
     ////////////
     // Events //
@@ -149,12 +184,31 @@ contract IS21InstitutionalRewardVault is
         uint256 timestamp
     );
 
+    event RewardStreamConfigured(
+        uint64 indexed startEpoch,
+        uint64 indexed endEpoch,
+        uint256 rewardPerEpoch,
+        uint256 firstEpochBonus,
+        uint256 timestamp
+    );
+
     event RewardsAdded(
         address indexed rewardManager,
         uint256 totalAmount,
         uint256 treasuryAmount,
         uint256 stabilityReserveAmount,
         uint256 vaultRewardAmount,
+        uint64 epochCount,
+        uint64 startEpoch,
+        uint64 endEpoch,
+        uint256 rolledLeftover,
+        uint256 timestamp
+    );
+
+    event PrincipalUpdated(
+        address indexed account,
+        uint256 oldPrincipal,
+        uint256 newPrincipal,
         uint256 timestamp
     );
 
@@ -171,6 +225,7 @@ contract IS21InstitutionalRewardVault is
         address indexed from,
         address indexed to,
         uint256 shares,
+        uint256 principalDeposited,
         uint64 weightedDepositTimestamp,
         uint256 timestamp
     );
@@ -251,6 +306,7 @@ contract IS21InstitutionalRewardVault is
         sMinimumPositionAssets = DEFAULT_MINIMUM_POSITION;
         sWithdrawalPenaltyPeriod = DEFAULT_WITHDRAWAL_PENALTY_PERIOD;
         sWithdrawalPenaltyBps = 0;
+        EPOCH_ZERO_TIMESTAMP = uint64(block.timestamp);
     }
 
     ////////////////////////////////////
@@ -262,6 +318,21 @@ contract IS21InstitutionalRewardVault is
 
     function getVersion() external pure returns (string memory) {
         return IS21_INSTITUTIONAL_VAULT_VERSION;
+    }
+
+    /**
+     * @notice ERC4626 assets that are currently vested and owned by shareholders.
+     * @dev Unvested scheduled rewards are physically in the vault but excluded until streamed.
+     */
+    function totalAssets() public view override returns (uint256) {
+        uint256 currentBalance = IERC20(asset()).balanceOf(address(this));
+        uint256 unvestedRewards = getRemainingScheduledRewards();
+
+        if (unvestedRewards >= currentBalance) {
+            return 0;
+        }
+
+        return currentBalance - unvestedRewards;
     }
 
     function getTreasuryAddress() external view returns (address) {
@@ -282,6 +353,44 @@ contract IS21InstitutionalRewardVault is
 
     function getWithdrawalPenaltyBps() external view returns (uint256) {
         return sWithdrawalPenaltyBps;
+    }
+
+    function getEpochDuration() external pure returns (uint64) {
+        return EPOCH_DURATION;
+    }
+
+    function getEpochZeroTimestamp() external view returns (uint64) {
+        return EPOCH_ZERO_TIMESTAMP;
+    }
+
+    function getCurrentEpoch() public view returns (uint64) {
+        return _currentEpoch();
+    }
+
+    function getRewardStream() external view returns (RewardStream memory) {
+        return sRewardStream;
+    }
+
+    function getRemainingScheduledRewards() public view returns (uint256) {
+        return _remainingScheduledRewards(_currentEpoch());
+    }
+
+    function getVestedVaultRewards() external view returns (uint256) {
+        uint256 currentBalance = IERC20(asset()).balanceOf(address(this));
+        uint256 unvestedRewards = getRemainingScheduledRewards();
+
+        if (unvestedRewards >= currentBalance) {
+            return 0;
+        }
+
+        uint256 shareholderAssets = currentBalance - unvestedRewards;
+        uint256 totalPrincipal = _totalPrincipalDepositedBestEffort();
+
+        if (shareholderAssets <= totalPrincipal) {
+            return 0;
+        }
+
+        return shareholderAssets - totalPrincipal;
     }
 
     function getFundManagers() external view returns (address[] memory) {
@@ -314,6 +423,31 @@ contract IS21InstitutionalRewardVault is
         return sWhitelistedInstitutions.contains(account);
     }
 
+    function getPrincipalDeposited(
+        address account
+    ) external view returns (uint256) {
+        return sPrincipalDeposited[account];
+    }
+
+    function getCurrentPositionAssets(
+        address account
+    ) public view returns (uint256) {
+        return convertToAssets(balanceOf(account));
+    }
+
+    function getUnrealizedProfitLoss(
+        address account
+    ) public view returns (int256) {
+        uint256 currentAssets = getCurrentPositionAssets(account);
+        uint256 principal = sPrincipalDeposited[account];
+
+        if (currentAssets >= principal) {
+            return int256(currentAssets - principal);
+        }
+
+        return -int256(principal - currentAssets);
+    }
+
     function getWeightedDepositTimestamp(
         address account
     ) external view returns (uint64) {
@@ -324,6 +458,22 @@ contract IS21InstitutionalRewardVault is
         address account
     ) external view returns (uint64) {
         return sLastDepositBlock[account];
+    }
+
+    function getInstitutionPosition(
+        address account
+    ) external view returns (InstitutionPosition memory) {
+        return
+            InstitutionPosition({
+                principalDeposited: sPrincipalDeposited[account],
+                currentAssets: getCurrentPositionAssets(account),
+                unrealizedProfitLoss: getUnrealizedProfitLoss(account),
+                shareBalance: balanceOf(account),
+                weightedDepositTimestamp: sWeightedDepositTimestamp[account],
+                lastDepositBlock: sLastDepositBlock[account],
+                whitelisted: sWhitelistedInstitutions.contains(account),
+                withinPenaltyPeriod: isWithinPenaltyPeriod(account)
+            });
     }
 
     function isWithinPenaltyPeriod(address account) public view returns (bool) {
@@ -340,6 +490,13 @@ contract IS21InstitutionalRewardVault is
     ) public view returns (uint256) {
         if (!isWithinPenaltyPeriod(account)) return 0;
         return (grossAssets * sWithdrawalPenaltyBps) / BPS;
+    }
+
+    function previewNetWithdrawAssets(
+        address account,
+        uint256 grossAssets
+    ) external view returns (uint256) {
+        return grossAssets - previewWithdrawalPenalty(account, grossAssets);
     }
 
     function maxDeposit(
@@ -360,11 +517,13 @@ contract IS21InstitutionalRewardVault is
         address owner_
     ) public view override returns (uint256) {
         if (paused()) return 0;
+        if (sLastDepositBlock[owner_] == uint64(block.number)) return 0;
         return convertToAssets(balanceOf(owner_));
     }
 
     function maxRedeem(address owner_) public view override returns (uint256) {
         if (paused()) return 0;
+        if (sLastDepositBlock[owner_] == uint64(block.number)) return 0;
         return balanceOf(owner_);
     }
 
@@ -523,11 +682,16 @@ contract IS21InstitutionalRewardVault is
     }
 
     /**
-     * @notice Adds IS21 rewards to the institutional vault.
-     * @dev The 88% vault reward amount stays inside the vault and increases share price.
+     * @notice Adds IS21 rewards to the institutional vault and streams the vault portion over epochs.
+     * @param totalAmount Total IS21 supplied by the reward manager.
+     * @param epochCount Number of 1-hour epochs over which the 88% vault reward amount is streamed.
+     *
+     * @dev Existing unvested scheduled rewards are rolled into the new stream.
+     * @dev Reverts when there are no shares outstanding to avoid ambiguous reward ownership.
      */
     function addRewards(
-        uint256 totalAmount
+        uint256 totalAmount,
+        uint64 epochCount
     )
         external
         onlyRewardManager
@@ -535,8 +699,16 @@ contract IS21InstitutionalRewardVault is
         nonReentrant
         whenNotPaused
     {
+        if (epochCount == 0) {
+            revert IS21InstitutionalRewardVault__InvalidEpochCount();
+        }
+
         if (treasuryWallet == address(0) || stabilityWallet == address(0)) {
             revert IS21InstitutionalRewardVault__RewardAddressesNotConfigured();
+        }
+
+        if (totalSupply() == 0) {
+            revert IS21InstitutionalRewardVault__NoActiveInstitutionShares();
         }
 
         IERC20 assetToken = IERC20(asset());
@@ -556,12 +728,42 @@ contract IS21InstitutionalRewardVault is
             assetToken.safeTransfer(stabilityWallet, reserveAmount);
         }
 
+        uint64 currentEpoch = _currentEpoch();
+        uint256 leftover = _remainingScheduledRewards(currentEpoch);
+        uint256 totalForNewStream = leftover + vaultRewardAmount;
+
+        if (totalForNewStream == 0) {
+            revert IS21InstitutionalRewardVault__AmountMustBeMoreThanZero();
+        }
+
+        uint256 rewardPerEpoch = totalForNewStream / epochCount;
+        uint256 firstEpochBonus = totalForNewStream % epochCount;
+
+        sRewardStream = RewardStream({
+            startEpoch: currentEpoch,
+            endEpoch: currentEpoch + epochCount,
+            rewardPerEpoch: rewardPerEpoch,
+            firstEpochBonus: firstEpochBonus
+        });
+
+        emit RewardStreamConfigured(
+            currentEpoch,
+            currentEpoch + epochCount,
+            rewardPerEpoch,
+            firstEpochBonus,
+            block.timestamp
+        );
+
         emit RewardsAdded(
             msg.sender,
             totalAmount,
             treasuryAmount,
             reserveAmount,
             vaultRewardAmount,
+            epochCount,
+            currentEpoch,
+            currentEpoch + epochCount,
+            leftover,
             block.timestamp
         );
     }
@@ -611,7 +813,7 @@ contract IS21InstitutionalRewardVault is
     }
 
     /**
-     * @notice Rescue tokens accidentally sent to the contract, but never underlying IS21 assets backing shares.
+     * @notice Rescue tokens accidentally sent to the contract, but never underlying IS21 assets backing shares or unvested rewards.
      */
     function rescueErc20(
         address token,
@@ -619,7 +821,8 @@ contract IS21InstitutionalRewardVault is
         address to
     ) external onlyOwner nonZeroAddress(token) nonZeroAddress(to) nonReentrant {
         if (token == asset()) {
-            uint256 requiredBalance = totalAssets();
+            uint256 requiredBalance = totalAssets() +
+                getRemainingScheduledRewards();
             uint256 currentBalance = IERC20(token).balanceOf(address(this));
             uint256 freeBalance = currentBalance > requiredBalance
                 ? currentBalance - requiredBalance
@@ -660,15 +863,18 @@ contract IS21InstitutionalRewardVault is
             revert IS21InstitutionalRewardVault__AmountMustBeMoreThanZero();
         }
 
+        uint256 principalToMove = sPrincipalDeposited[msg.sender];
         uint64 weightedTimestampToMove = sWeightedDepositTimestamp[msg.sender];
 
         sPositionTransferInProgress = true;
         _transfer(msg.sender, to, sharesToMove);
         sPositionTransferInProgress = false;
 
+        sPrincipalDeposited[to] = principalToMove;
         sWeightedDepositTimestamp[to] = weightedTimestampToMove;
         sLastDepositBlock[to] = uint64(block.number);
 
+        delete sPrincipalDeposited[msg.sender];
         delete sWeightedDepositTimestamp[msg.sender];
         delete sLastDepositBlock[msg.sender];
 
@@ -676,6 +882,7 @@ contract IS21InstitutionalRewardVault is
             msg.sender,
             to,
             sharesToMove,
+            principalToMove,
             weightedTimestampToMove,
             block.timestamp
         );
@@ -730,7 +937,18 @@ contract IS21InstitutionalRewardVault is
             sWeightedDepositTimestamp[receiver] = uint64(newWeightedTimestamp);
         }
 
+        uint256 oldPrincipal = sPrincipalDeposited[receiver];
+        uint256 newPrincipal = oldPrincipal + assets;
+        sPrincipalDeposited[receiver] = newPrincipal;
+
         sLastDepositBlock[receiver] = uint64(block.number);
+
+        emit PrincipalUpdated(
+            receiver,
+            oldPrincipal,
+            newPrincipal,
+            block.timestamp
+        );
 
         super._deposit(caller, receiver, assets, shares);
     }
@@ -742,13 +960,26 @@ contract IS21InstitutionalRewardVault is
         uint256 assets,
         uint256 shares
     ) internal override whenNotPaused {
+        if (sLastDepositBlock[owner_] == uint64(block.number)) {
+            revert IS21InstitutionalRewardVault__SameBlockWithdrawNotAllowed();
+        }
+
         uint256 ownerSharesBefore = balanceOf(owner_);
         uint256 ownerAssetsBefore = convertToAssets(ownerSharesBefore);
+        uint256 principalBefore = sPrincipalDeposited[owner_];
 
         if (shares < ownerSharesBefore) {
             uint256 ownerAssetsAfter = ownerAssetsBefore - assets;
             if (ownerAssetsAfter < sMinimumPositionAssets) {
                 revert IS21InstitutionalRewardVault__RemainingBalanceBelowMinimum();
+            }
+        }
+
+        uint256 principalReduction = 0;
+        if (principalBefore > 0 && ownerSharesBefore > 0) {
+            principalReduction = (principalBefore * shares) / ownerSharesBefore;
+            if (principalReduction > principalBefore) {
+                principalReduction = principalBefore;
             }
         }
 
@@ -764,12 +995,9 @@ contract IS21InstitutionalRewardVault is
 
             _burn(owner_, shares);
 
-            SafeERC20.safeTransfer(
-                IERC20(asset()),
-                stabilityWallet,
-                penaltyAmount
-            );
-            SafeERC20.safeTransfer(IERC20(asset()), receiver, netAssets);
+            IERC20 assetToken = IERC20(asset());
+            assetToken.safeTransfer(stabilityWallet, penaltyAmount);
+            assetToken.safeTransfer(receiver, netAssets);
 
             emit Withdraw(caller, receiver, owner_, assets, shares);
             emit WithdrawalPenaltyPaid(
@@ -782,10 +1010,22 @@ contract IS21InstitutionalRewardVault is
             );
         }
 
+        uint256 newPrincipal = principalBefore - principalReduction;
+
         if (balanceOf(owner_) == 0) {
+            newPrincipal = 0;
             delete sWeightedDepositTimestamp[owner_];
             delete sLastDepositBlock[owner_];
         }
+
+        sPrincipalDeposited[owner_] = newPrincipal;
+
+        emit PrincipalUpdated(
+            owner_,
+            principalBefore,
+            newPrincipal,
+            block.timestamp
+        );
     }
 
     /**
@@ -807,10 +1047,83 @@ contract IS21InstitutionalRewardVault is
         super._update(from, to, value);
     }
 
+    ////////////////////////////////////
+    // Reward Streaming Internals     //
+    ////////////////////////////////////
+    function _currentEpoch() internal view returns (uint64) {
+        return
+            uint64((block.timestamp - EPOCH_ZERO_TIMESTAMP) / EPOCH_DURATION);
+    }
+
+    function _scheduledRewardsBetween(
+        uint64 fromEpoch,
+        uint64 toEpoch
+    ) internal view returns (uint256 amount) {
+        RewardStream memory stream = sRewardStream;
+
+        if (toEpoch <= fromEpoch) return 0;
+        if (stream.endEpoch <= stream.startEpoch) return 0;
+        if (toEpoch <= stream.startEpoch) return 0;
+        if (fromEpoch >= stream.endEpoch) return 0;
+
+        uint64 overlapStart = fromEpoch > stream.startEpoch
+            ? fromEpoch
+            : stream.startEpoch;
+        uint64 overlapEnd = toEpoch < stream.endEpoch
+            ? toEpoch
+            : stream.endEpoch;
+
+        if (overlapEnd <= overlapStart) return 0;
+
+        uint256 epochCount = uint256(overlapEnd - overlapStart);
+        amount = epochCount * stream.rewardPerEpoch;
+
+        if (overlapStart == stream.startEpoch) {
+            amount += stream.firstEpochBonus;
+        }
+    }
+
+    function _remainingScheduledRewards(
+        uint64 currentEpoch
+    ) internal view returns (uint256) {
+        RewardStream memory stream = sRewardStream;
+
+        if (stream.endEpoch <= stream.startEpoch) return 0;
+        if (currentEpoch >= stream.endEpoch) return 0;
+
+        uint64 start = currentEpoch > stream.startEpoch
+            ? currentEpoch
+            : stream.startEpoch;
+
+        return _scheduledRewardsBetween(start, stream.endEpoch);
+    }
+
     function _isEmptyPosition(address account) internal view returns (bool) {
         return
             balanceOf(account) == 0 &&
+            sPrincipalDeposited[account] == 0 &&
             sWeightedDepositTimestamp[account] == 0 &&
             sLastDepositBlock[account] == 0;
+    }
+
+    /**
+     * @dev Best-effort aggregate for reporting only. Avoid using this in state-changing logic
+     *      because looping over many institutions can become expensive.
+     */
+    function _totalPrincipalDepositedBestEffort()
+        internal
+        view
+        returns (uint256 totalPrincipal)
+    {
+        uint256 length = sWhitelistedInstitutions.length();
+        for (uint256 i = 0; i < length; ) {
+            totalPrincipal += sPrincipalDeposited[
+                sWhitelistedInstitutions.at(i)
+            ];
+
+            unchecked {
+                ++i;
+            }
+        }
     }
 }
