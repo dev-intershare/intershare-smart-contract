@@ -50,17 +50,6 @@ contract DeployIS21InstitutionalRewardVault is Script {
 
         console.log("------- Deploying IS21InstitutionalRewardVault -------");
         console.log("Deploying to chain ID:", block.chainid);
-        console.log("Owner:", activeNetworkConfig.owner);
-        console.log("IS21 asset:", activeNetworkConfig.is21Address);
-        console.log(
-            "Treasury wallet:",
-            activeNetworkConfig.treasuryWalletAddress
-        );
-        console.log(
-            "Stability wallet:",
-            activeNetworkConfig.stabilityWalletAddress
-        );
-
         vm.startBroadcast(activeNetworkConfig.deployerKey);
 
         IS21InstitutionalRewardVault vault = new IS21InstitutionalRewardVault(

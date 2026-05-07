@@ -121,20 +121,28 @@ Swaps require **signed quotes** issued by a trusted signer.
 
 ------------------------------------------------------------------------
 
-# 🪙 Yield Vault
+# 🪙 Yield Vault(s)
 
-`IS21RewardVault` will allow users to **stake IS21 and earn IS21
+`IS21RetailRewardVault` and `IS21InstitutionalRewardVault` will allow users to **stake IS21 and earn IS21
 rewards**.
 
 The vault is based on the **ERC4626 tokenized vault standard**.
 
-### Features
+### Features (Retail)
 
 -   Push-based reward distribution
 -   Streaming rewards
 -   Loyalty multiplier tiers
 -   No lockups
 -   Flash‑loan protection
+
+### Features (Institutional)
+
+-   Push-based reward distribution
+-   Streaming rewards
+-   No lockups
+-   Flash‑loan protection
+-   Whitelisted addresses only (KYC & KYB required)
 
 ------------------------------------------------------------------------
 
@@ -163,8 +171,9 @@ lending protocol inspired by systems like Aave.
 │   │   ├── IS21FundManagerGateway.sol
 │   │   └── IS21USDTSwappingGateway.sol
 │   │
-│   ├── vaults/             # IS21 staking vault
-│   │   └── IS21RewardVault.sol
+│   ├── vaults/             # IS21 staking vaults
+│   │   ├── IS21InstitutionalRewardVault.sol
+│   │   └── IS21RetailRewardVault.sol
 │   │
 │   ├── libraries/          # Libraries
 │   │  
@@ -185,15 +194,18 @@ lending protocol inspired by systems like Aave.
 │   ├── DeployIS21Engine.s.sol
 │   ├── DeployIS21FundManagerGateway.s.sol
 │   ├── DeployIS21USDTSwappingGateway.s.sol
-│   ├── DeployIS21YieldVault.s.sol
+│   ├── DeployIS21InstitutionalRewardVault.s.sol
+│   ├── DeployIS21RetailRewardVault.s.sol
 │   └── DeployMockUSDT.s.sol
 │
 ├── scripts/                # Bash deployment scripts (calls the solidity deployment scripts)
 │   ├── _deploy.sh
+│   ├── deploy_all.sh
 │   ├── deploy_is21_engine.sh
 │   ├── deploy_is21_fund_manager_gateway.sh
 │   ├── deploy_is21_usdt_swapping_gateway.sh
-│   ├── deploy_is21_yield_vault.sh
+│   ├── deploy_is21_institutional_reward_vault.sh
+│   ├── deploy_is21_retail_reward_vault.sh
 │   └── deploy_mock_usdt.sh
 │
 ├── test/                   # Tests for unit, fuzz and mock testing
