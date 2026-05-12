@@ -6,6 +6,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "🚀 Starting ordered deployment on anvil"
 
+### NB : DO NOT CHANGE THE ORDER HERE AS YOU MIGHT BREAK STUFF LOCALLY
+
 echo "Deploying IS21Engine..."
 "$SCRIPT_DIR/deploy_is21_engine.sh" anvil "$SIMULATE"
 
@@ -23,5 +25,8 @@ echo "Deploying IS21RetailRewardVault..."
 
 echo "Deploying IS21InstitutionalRewardVault..."
 "$SCRIPT_DIR/deploy_is21_institutional_reward_vault.sh" anvil "$SIMULATE"
+
+echo "Deploying IS21USDCMock..."
+"$SCRIPT_DIR/deploy_mock_usdc.sh" anvil "$SIMULATE"
 
 echo "✅ Ordered anvil deployment complete."
