@@ -183,6 +183,7 @@ lending protocol inspired by systems like Aave.
 │   │   
 │   │
 │   ├── mocks/              # Any mock contracts
+│   │   ├── MockUSDC.sol
 │   │   └── MockUSDT.sol
 │   │
 │   ├── config/             # Any config
@@ -196,6 +197,7 @@ lending protocol inspired by systems like Aave.
 │   ├── DeployIS21USDTSwappingGateway.s.sol
 │   ├── DeployIS21InstitutionalRewardVault.s.sol
 │   ├── DeployIS21RetailRewardVault.s.sol
+│   ├── DeployMockUSDC.s.sol
 │   └── DeployMockUSDT.s.sol
 │
 ├── scripts/                # Bash deployment scripts (calls the solidity deployment scripts)
@@ -206,6 +208,7 @@ lending protocol inspired by systems like Aave.
 │   ├── deploy_is21_usdt_swapping_gateway.sh
 │   ├── deploy_is21_institutional_reward_vault.sh
 │   ├── deploy_is21_retail_reward_vault.sh
+│   ├── deploy_mock_usdc.sh
 │   └── deploy_mock_usdt.sh
 │
 ├── test/                   # Tests for unit, fuzz and mock testing
